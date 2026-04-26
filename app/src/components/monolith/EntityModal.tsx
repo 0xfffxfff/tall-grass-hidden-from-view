@@ -273,32 +273,41 @@ export function EntityModal({
             &middot; to add to the public record.
           </p>
 
-          <WorkStrip scope="public" className="modal-work" />
+          {/* WorkStrip is suppressed while the consent prompt is up — its
+              "waiting for confirmation" label would just duplicate what
+              the prompt already says, in the row immediately below. */}
+          {!fhe.awaitingConsent && (
+            <WorkStrip scope="public" className="modal-work" />
+          )}
           {fhe.awaitingConsent && (
             <div
               className="modal-consent"
               role="group"
               aria-label="cloud key download confirmation"
             >
-              <span className="pip" />
-              <span className="label">
-                first use downloads a ~78 MB homomorphic-encryption key to
-                your browser
-              </span>
-              <button
-                type="button"
-                className="consent-action"
-                onClick={fhe.grantConsent}
-              >
-                continue
-              </button>
-              <button
-                type="button"
-                className="consent-action ghost"
-                onClick={fhe.cancelConsent}
-              >
-                cancel
-              </button>
+              <div className="line">
+                <span className="pip" />
+                <span className="label">
+                  first use downloads a ~78 MB homomorphic-encryption key to
+                  your browser
+                </span>
+              </div>
+              <div className="actions">
+                <button
+                  type="button"
+                  className="consent-action"
+                  onClick={fhe.grantConsent}
+                >
+                  continue
+                </button>
+                <button
+                  type="button"
+                  className="consent-action ghost"
+                  onClick={fhe.cancelConsent}
+                >
+                  cancel
+                </button>
+              </div>
             </div>
           )}
           {fhe.status === "error" && fhe.message && (
