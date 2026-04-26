@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TFHE WASM — Browser Test</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'SF Mono', 'Fira Code', monospace; background: #0a0a0a; color: #e0e0e0; padding: 2rem; max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 1.2rem; font-weight: normal; margin-bottom: 1.5rem; color: #888; }
+    .section { margin-bottom: 2rem; }
+    .section h2 { font-size: 0.9rem; color: #666; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.5rem; }
+    .log { background: #111; border: 1px solid #222; padding: 1rem; font-size: 0.8rem; line-height: 1.6; white-space: pre-wrap; overflow-x: auto; min-height: 100px; }
+    .log .ok { color: #4a4; }
+    .log .fail { color: #a44; }
+    .log .dim { color: #555; }
+    .log .value { color: #8af; }
+    .progress-bar { width: 100%; height: 4px; background: #222; margin: 1rem 0; }
+    .progress-fill { height: 100%; background: #4a4; width: 0%; transition: width 0.1s; }
+    button { font-family: inherit; font-size: 0.8rem; padding: 0.5rem 1.2rem; background: #222; color: #e0e0e0; border: 1px solid #333; cursor: pointer; margin-right: 0.5rem; margin-bottom: 0.5rem; }
+    button:hover { background: #333; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .controls { margin-bottom: 1rem; }
+    input[type="number"] { font-family: inherit; font-size: 0.8rem; padding: 0.4rem 0.6rem; background: #111; color: #e0e0e0; border: 1px solid #333; width: 5rem; margin-right: 0.5rem; }
+  </style>
+</head>
+<body>
+  <h1>tfhe-wasm / browser test</h1>
+
+  <div class="section">
+    <h2>Controls</h2>
+    <div class="controls">
+      <button id="btn-self-test">Self-Test (full pipeline)</button>
+      <button id="btn-benchmark">Benchmark</button>
+    </div>
+    <div class="controls">
+      <label>
+        a: <input type="number" id="input-a" value="42" min="0" max="255">
+      </label>
+      <label>
+        b: <input type="number" id="input-b" value="17" min="0" max="255">
+      </label>
+      <button id="btn-compare">Compare</button>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+  </div>
+
+  <div class="section">
+    <h2>Output</h2>
+    <div class="log" id="output"></div>
+  </div>
+
+  <script src="../dist/tfhe.js"></script>
+  <script type="module">
+    // createTFHEModule is now a global from the script above
+
+    let Module = null;
+    const output = document.getElementById('output');
+    const progress = document.getElementById('progress');
+
+    function log(text, cls = '') {
+      const span = document.createElement('span');
+      if (cls) span.className = cls;
+      span.textContent = text;
+      output.appendChild(span);
+      output.scrollTop = output.scrollHeight;
+    }
+
+    function clear() { output.innerHTML = ''; }
+
+    function setProgress(pct) { progress.style.width = pct + '%'; }
+
+    function disableButtons(disabled) {
+      document.querySelectorAll('button').forEach(b => b.disabled = disabled);
+    }
+
+    // Initialize on load
+    async function init() {
+      log('Loading TFHE WASM module...\n', 'dim');
+      const t0 = performance.now();
+      Module = await createTFHEModule();
+      const ms = performance.now() - t0;
+      log(`Module loaded in ${ms.toFixed(0)}ms\n\n`, 'dim');
+    }
+
+    console.log('tfhe-wasm: module script executing');
+    init().catch(e => {
+      console.error('tfhe-wasm: init failed', e);
+      log('Init failed: ' + e.message + '\n', 'fail');
+    });
+
+    // Helpers
+    function callWithBuffer(name, ...args) {
+      const lenPtr = Module._tfhe_malloc(4);
+      const allArgs = [...args, lenPtr];
+      const argTypes = allArgs.map(() => 'number');
+      const dataPtr = Module.ccall(name, 'number', argTypes, allArgs);
+      const len = Module.getValue(lenPtr, 'i32');
+      Module._tfhe_free(lenPtr);
+      if (!dataPtr || len === 0) throw new Error(`${name} failed`);
+      const result = new Uint8Array(Module.HEAPU8.buffer, dataPtr, len).slice();
+      Module._tfhe_free(dataPtr);
+      return result;
+    }
+
+    function callWithInput(name, ...buffers) {
+      const ptrs = [];
+      const args = [];
+      const argTypes = [];
+      for (const buf of buffers) {
+        const ptr = Module._tfhe_malloc(buf.length);
+        Module.HEAPU8.set(buf, ptr);
+        ptrs.push(ptr);
+        args.push(ptr, buf.length);
+        argTypes.push('number', 'number');
+      }
+      const lenPtr = Module._tfhe_malloc(4);
+      args.push(lenPtr);
+      argTypes.push('number');
+      const dataPtr = Module.ccall(name, 'number', argTypes, args);
+      const len = Module.getValue(lenPtr, 'i32');
+      Module._tfhe_free(lenPtr);
+      for (const p of ptrs) Module._tfhe_free(p);
+      if (!dataPtr || len === 0) throw new Error(`${name} failed`);
+      const result = new Uint8Array(Module.HEAPU8.buffer, dataPtr, len).slice();
+      Module._tfhe_free(dataPtr);
+      return result;
+    }
+
+    function decryptBit(ct) {
+      const ptr = Module._tfhe_malloc(ct.length);
+      Module.HEAPU8.set(ct, ptr);
+      const val = Module.ccall('tfhe_decrypt_bit', 'number', ['number', 'number'], [ptr, ct.length]);
+      Module._tfhe_free(ptr);
+      return val;
+    }
+
+    // Self-test
+    async function runSelfTest() {
+      if (!Module) { log('Module not loaded yet\n', 'fail'); return; }
+      clear();
+      disableButtons(true);
+      setProgress(0);
+
+      await new Promise(r => setTimeout(r, 10));
+
+      try {
+        log('=== Self-Test ===\n\n');
+
+        log('Generating keys (lambda=80)...\n', 'dim');
+        let t0 = performance.now();
+        Module.ccall('tfhe_generate_keys', 'number', ['number'], [80]);
+        log(`  Key generation: `, 'dim'); log(`${(performance.now() - t0).toFixed(0)}ms\n`, 'value');
+        setProgress(10);
+
+        const testCases = [[42, 17], [17, 42], [100, 100], [0, 255], [255, 0]];
+        let allCorrect = true;
+
+        for (let idx = 0; idx < testCases.length; idx++) {
+          const [a, b] = testCases[idx];
+          log(`\n${a} vs ${b}: `, 'dim');
+
+          const ctA = callWithBuffer('tfhe_encrypt_u8', a);
+          const ctB = callWithBuffer('tfhe_encrypt_u8', b);
+
+          t0 = performance.now();
+          const gtCt = callWithInput('tfhe_compare_gt', ctA, ctB);
+          const gtMs = performance.now() - t0;
+
+          t0 = performance.now();
+          const eqCt = callWithInput('tfhe_compare_eq', ctA, ctB);
+          const eqMs = performance.now() - t0;
+
+          const gt = decryptBit(gtCt);
+          const eq = decryptBit(eqCt);
+
+          const expectedGt = a > b ? 1 : 0;
+          const expectedEq = a === b ? 1 : 0;
+          const correct = gt === expectedGt && eq === expectedEq;
+
+          log(`GT=${gt} EQ=${eq} `, 'value');
+          log(`(${gtMs.toFixed(0)}ms/${eqMs.toFixed(0)}ms) `, 'dim');
+          log(correct ? 'OK\n' : 'FAIL\n', correct ? 'ok' : 'fail');
+
+          if (!correct) allCorrect = false;
+          setProgress(10 + (idx + 1) * 18);
+        }
+
+        Module.ccall('tfhe_cleanup', null, [], []);
+
+        log('\n');
+        log(allCorrect ? 'ALL TESTS PASSED\n' : 'SOME TESTS FAILED\n', allCorrect ? 'ok' : 'fail');
+      } catch (e) {
+        log('\nError: ' + e.message + '\n', 'fail');
+      }
+
+      setProgress(100);
+      disableButtons(false);
+    };
+
+    // Benchmark
+    async function runBenchmark() {
+      if (!Module) { log('Module not loaded yet\n', 'fail'); return; }
+      clear();
+      disableButtons(true);
+      setProgress(0);
+
+      await new Promise(r => setTimeout(r, 10));
+
+      try {
+        log('=== Benchmark ===\n\n');
+
+        // Key generation
+        log('Key generation (lambda=80)...\n', 'dim');
+        let t0 = performance.now();
+        Module.ccall('tfhe_generate_keys', 'number', ['number'], [80]);
+        const keyGenMs = performance.now() - t0;
+        log(`  Time: `, 'dim'); log(`${keyGenMs.toFixed(0)}ms\n`, 'value');
+        setProgress(15);
+
+        // Key sizes
+        const sk = callWithBuffer('tfhe_export_secret_key');
+        const ck = callWithBuffer('tfhe_export_cloud_key');
+        log(`  Secret key: `, 'dim'); log(`${(sk.length / 1024 / 1024).toFixed(2)} MB\n`, 'value');
+        log(`  Cloud key:  `, 'dim'); log(`${(ck.length / 1024 / 1024).toFixed(2)} MB\n`, 'value');
+        setProgress(25);
+
+        // Ciphertext sizes
+        const ctSize = Module.ccall('tfhe_ciphertext_size', 'number', [], []);
+        log(`  Single CT:  `, 'dim'); log(`${ctSize} bytes\n`, 'value');
+        log(`  8-bit CT:   `, 'dim'); log(`${(ctSize * 8 / 1024).toFixed(1)} KB\n`, 'value');
+
+        // Encrypt
+        log('\nEncryption (8-bit)...\n', 'dim');
+        t0 = performance.now();
+        const ctA = callWithBuffer('tfhe_encrypt_u8', 42);
+        const ctB = callWithBuffer('tfhe_encrypt_u8', 17);
+        const encMs = performance.now() - t0;
+        log(`  Time (2 values): `, 'dim'); log(`${encMs.toFixed(1)}ms\n`, 'value');
+        setProgress(35);
+
+        // GT comparison
+        log('\n8-bit GT comparison (24 gates)...\n', 'dim');
+        t0 = performance.now();
+        const gtCt = callWithInput('tfhe_compare_gt', ctA, ctB);
+        const gtMs = performance.now() - t0;
+        log(`  Time: `, 'dim'); log(`${gtMs.toFixed(0)}ms\n`, 'value');
+        log(`  Per gate: `, 'dim'); log(`${(gtMs / 24).toFixed(0)}ms\n`, 'value');
+        setProgress(60);
+
+        // EQ comparison
+        log('\n8-bit EQ comparison (15 gates)...\n', 'dim');
+        t0 = performance.now();
+        const eqCt = callWithInput('tfhe_compare_eq', ctA, ctB);
+        const eqMs = performance.now() - t0;
+        log(`  Time: `, 'dim'); log(`${eqMs.toFixed(0)}ms\n`, 'value');
+        log(`  Per gate: `, 'dim'); log(`${(eqMs / 15).toFixed(0)}ms\n`, 'value');
+        setProgress(85);
+
+        // Decrypt
+        log('\nDecryption...\n', 'dim');
+        t0 = performance.now();
+        const gt = decryptBit(gtCt);
+        const eq = decryptBit(eqCt);
+        const decMs = performance.now() - t0;
+        log(`  Time: `, 'dim'); log(`${decMs.toFixed(1)}ms\n`, 'value');
+        log(`  GT(42,17)=${gt} EQ(42,17)=${eq}\n`, 'value');
+
+        // Correctness check
+        const correct = gt === 1 && eq === 0;
+        log('\n');
+        log(correct ? 'Correctness: OK\n' : 'Correctness: FAIL\n', correct ? 'ok' : 'fail');
+
+        // Memory usage
+        const memUsed = Module.HEAPU8.buffer.byteLength;
+        log(`\nWASM memory: `, 'dim'); log(`${(memUsed / 1024 / 1024).toFixed(0)} MB\n`, 'value');
+
+        // Summary
+        log('\n--- Summary ---\n', 'dim');
+        log(`Key gen:      ${keyGenMs.toFixed(0)}ms\n`, 'value');
+        log(`Cloud key:    ${(ck.length / 1024 / 1024).toFixed(2)} MB\n`, 'value');
+        log(`8-bit CT:     ${(ctSize * 8 / 1024).toFixed(1)} KB\n`, 'value');
+        log(`GT (24 gates): ${gtMs.toFixed(0)}ms (${(gtMs / 24).toFixed(0)}ms/gate)\n`, 'value');
+        log(`EQ (15 gates): ${eqMs.toFixed(0)}ms (${(eqMs / 15).toFixed(0)}ms/gate)\n`, 'value');
+        log(`WASM binary:  ${((await (await fetch('../dist/tfhe.wasm')).arrayBuffer()).byteLength / 1024).toFixed(1)} KB\n`, 'value');
+        log(`WASM memory:  ${(memUsed / 1024 / 1024).toFixed(0)} MB\n`, 'value');
+
+        Module.ccall('tfhe_cleanup', null, [], []);
+      } catch (e) {
+        log('\nError: ' + e.message + '\n', 'fail');
+      }
+
+      setProgress(100);
+      disableButtons(false);
+    };
+
+    // Custom comparison
+    async function runCompare() {
+      if (!Module) { log('Module not loaded yet\n', 'fail'); return; }
+      clear();
+      disableButtons(true);
+      setProgress(0);
+
+      await new Promise(r => setTimeout(r, 10));
+
+      const a = parseInt(document.getElementById('input-a').value);
+      const b = parseInt(document.getElementById('input-b').value);
+
+      if (isNaN(a) || isNaN(b) || a < 0 || a > 255 || b < 0 || b > 255) {
+        log('Values must be 0-255\n', 'fail');
+        disableButtons(false);
+        return;
+      }
+
+      try {
+        log(`Comparing ${a} vs ${b}\n\n`, 'dim');
+
+        log('Generating keys...\n', 'dim');
+        Module.ccall('tfhe_generate_keys', 'number', ['number'], [80]);
+        setProgress(15);
+
+        log('Encrypting...\n', 'dim');
+        const ctA = callWithBuffer('tfhe_encrypt_u8', a);
+        const ctB = callWithBuffer('tfhe_encrypt_u8', b);
+        setProgress(20);
+
+        log('Computing GT...\n', 'dim');
+        let t0 = performance.now();
+        const gtCt = callWithInput('tfhe_compare_gt', ctA, ctB);
+        const gtMs = performance.now() - t0;
+        setProgress(55);
+
+        log('Computing EQ...\n', 'dim');
+        t0 = performance.now();
+        const eqCt = callWithInput('tfhe_compare_eq', ctA, ctB);
+        const eqMs = performance.now() - t0;
+        setProgress(90);
+
+        log('Decrypting...\n', 'dim');
+        const gt = decryptBit(gtCt);
+        const eq = decryptBit(eqCt);
+
+        log(`\n${a} > ${b} = `, 'dim'); log(`${gt}\n`, 'value');
+        log(`${a} = ${b} = `, 'dim'); log(`${eq}\n`, 'value');
+        log(`GT time: `, 'dim'); log(`${gtMs.toFixed(0)}ms\n`, 'value');
+        log(`EQ time: `, 'dim'); log(`${eqMs.toFixed(0)}ms\n`, 'value');
+
+        const expectedGt = a > b ? 1 : 0;
+        const expectedEq = a === b ? 1 : 0;
+        const correct = gt === expectedGt && eq === expectedEq;
+        log('\n');
+        log(correct ? 'Correct\n' : 'INCORRECT\n', correct ? 'ok' : 'fail');
+
+        Module.ccall('tfhe_cleanup', null, [], []);
+      } catch (e) {
+        log('\nError: ' + e.message + '\n', 'fail');
+      }
+
+      setProgress(100);
+      disableButtons(false);
+    };
+    document.getElementById('btn-self-test').addEventListener('click', () => { console.log('click: self-test'); runSelfTest(); });
+    document.getElementById('btn-benchmark').addEventListener('click', () => { console.log('click: benchmark'); runBenchmark(); });
+    document.getElementById('btn-compare').addEventListener('click', () => { console.log('click: compare'); runCompare(); });
+    console.log('tfhe-wasm: event listeners attached');
+  </script>
+</body>
+</html>

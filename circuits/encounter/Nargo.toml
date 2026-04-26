@@ -1,0 +1,9 @@
+[package]
+name = "encounter"
+type = "bin"
+authors = ["0xfff"]
+compiler_version = ">=0.36.0"
+
+[dependencies]
+lib = { path = "../lib" }
+poseidon = { tag = "v0.2.3", git = "https://github.com/noir-lang/poseidon" }

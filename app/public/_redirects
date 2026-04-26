@@ -1,0 +1,3 @@
+/api/*    https://hiddenfromview.0xfff.love/api/:splat    200
+/data/*   https://hiddenfromview.0xfff.love/data/:splat   200
+/*        /index.html                                     200

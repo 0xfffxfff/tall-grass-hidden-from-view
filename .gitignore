@@ -1,0 +1,22 @@
+.claude
+settings.local.json
+.DS_Store
+target/
+node_modules/
+app/data/
+app/dist/
+app/persist/
+app/src/generated.ts
+.anvil.pid
+.server.pid
+.server.log
+CLAUDE.md
+TODO.md
+
+# reference image thumbnails (regenerable, used for sub-agent visual review)
+.thumbs/
+
+# private working materials — kept locally, not in repo
+references/
+context/
+previews/

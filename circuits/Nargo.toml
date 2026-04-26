@@ -1,0 +1,2 @@
+[workspace]
+members = ["lib", "movement", "entity_movement", "encounter", "decryption"]

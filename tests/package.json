@@ -1,0 +1,18 @@
+{
+  "name": "tall-grass-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "pretest": "cd ../circuits && $HOME/.nargo/bin/nargo compile",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@noir-lang/noir_js": "1.0.0-beta.18",
+    "@noir-lang/types": "1.0.0-beta.18",
+    "@aztec/bb.js": "2.1.11",
+    "circomlibjs": "^0.1.7",
+    "vitest": "^3.0.0",
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  }
+}
