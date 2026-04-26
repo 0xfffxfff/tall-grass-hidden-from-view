@@ -167,7 +167,7 @@
   right: 24px;
   z-index: 50;
   margin: 0;
-  padding: 2px 10px 4px;
+  padding: 2px 10px;
   color: var(--fg-mid);
   font: inherit;
   font-size: 10px;
@@ -438,8 +438,8 @@ body[data-state="registered"] .you {
 }
 
 /* Cloud-key consent prompt. Mirrors .work-strip vocabulary: pip + mono
-   label, but with two inline text-buttons. Shown on first use of any
-   browser; persisted via localStorage afterwards. */
+   label, but with two inline text-buttons. Shown only on mobile-class
+   devices on first use; persisted via localStorage afterwards. */
 .public-consent {
   display: flex;
   align-items: baseline;
@@ -504,7 +504,7 @@ body[data-state="registered"] .you {
 /*  ENTITY REGISTRY                                                   */
 /* ------------------------------------------------------------------ */
 .registry {
-  max-width: 680px;
+  max-width: 980px;
   margin: 88px auto 0;
   padding: 0 28px;
 }
@@ -546,40 +546,78 @@ body[data-state="registered"] .you {
 .registry-modes .mode:hover { color: var(--fg-mid); }
 .registry-modes .mode.on { color: var(--fg); }
 
-.registry-list {
+.registry-grid {
   list-style: none;
   margin: 0;
   padding: 0;
-  font-family: var(--font-mono);
-  font-size: 12.5px;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.95;
-}
-.registry-list li {
   display: grid;
-  grid-template-columns: 4em 11em auto;
-  column-gap: 14px;
-  align-items: baseline;
-  color: var(--fg);
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 14px;
 }
-.registry-list li.unminted { color: var(--fg-dim); }
-.registry-list .entity-id {
-  color: inherit;
-  cursor: pointer;
-  border: 0;
-  border-bottom: 1px solid var(--fg-faint);
-  padding: 0 0 1px;
+.registry-grid .tile { margin: 0; padding: 0; }
+.tile-button {
+  display: block;
+  width: 100%;
   background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
   font: inherit;
 }
-.registry-list li.unminted .entity-id { border-bottom-color: var(--fg-ghost); }
-.registry-list .entity-id:hover { border-bottom-color: var(--fg); }
-.registry-list .owner { color: var(--fg-mid); }
-.registry-list .owner-empty { color: var(--fg-faint); font-style: normal; }
-.registry-list .me {
-  color: var(--fg);
+.tile-image {
+  display: block;
+  position: relative;
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  background: var(--fg-bare);
+  overflow: hidden;
+}
+.tile-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: grayscale(0.05) contrast(1.02);
+  transition: filter 200ms ease, transform 400ms ease;
+}
+.tile-button:hover .tile-image img { filter: none; }
+.tile-veil {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background:
+    repeating-linear-gradient(
+      45deg,
+      #0e0e0e 0 6px,
+      #060606 6px 12px
+    );
+}
+.tile.veiled .tile-image { outline: 1px solid var(--fg-ghost); outline-offset: -1px; }
+.tile.revealed .tile-image { outline: 1px solid var(--fg-faint); outline-offset: -1px; }
+.tile.mine .tile-image { outline-color: var(--fg); }
+.tile-button:hover .tile-image { outline-color: var(--fg-mid); }
+.tile.mine .tile-button:hover .tile-image { outline-color: var(--fg); }
+
+.tile-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+  font-family: var(--font-mono);
   font-size: 11px;
-  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.tile-id { color: var(--fg); }
+.tile.veiled .tile-id { color: var(--fg-dim); }
+.tile-owner { color: var(--fg-mid); }
+.tile.veiled .tile-owner { color: var(--fg-faint); }
+.tile-owner .me {
+  color: var(--fg);
+  margin-left: 4px;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1096,6 +1134,375 @@ body.report-mode .titlebar { display: none; }
   body.report-mode .report-body th,
   body.report-mode .report-body td { border-bottom-color: #bbb; }
   @page { margin: 18mm; }
+}
+
+/* ------------------------------------------------------------------ */
+/*  ENTITY MODAL — full-bleed detail view of a single entity          */
+/*                                                                     */
+/*  Layered as: backdrop (blur + dim) -> modal (two-pane on desktop,   */
+/*  stacked on mobile). Left pane is the 9:16 hero plus a compact      */
+/*  identity strip; right pane is a 7-trait x N-other matrix above a   */
+/*  recent-reveals tail. Cells reuse .heatmap busy/flash semantics for */
+/*  in-flight homomorphic compares.                                   */
+/* ------------------------------------------------------------------ */
+.entity-modal-root { position: relative; z-index: 50; }
+
+.entity-modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 50;
+}
+
+.entity-modal {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(1200px, 94vw);
+  height: min(86vh, 920px);
+  background: #000;
+  border: 1px solid var(--fg-ghost);
+  z-index: 60;
+  display: grid;
+  grid-template-columns: 460px 1fr;
+  overflow: hidden;
+}
+
+/* ---------- Left: image + identity ---------- */
+.entity-modal .pane-image {
+  background: var(--fg-bare);
+  position: relative;
+  overflow: hidden;
+  border-right: 1px solid var(--fg-ghost);
+  display: flex;
+  flex-direction: column;
+}
+.entity-modal .pane-image .hero {
+  flex: 1;
+  background: #000 center/cover no-repeat;
+  aspect-ratio: 9 / 16;
+  position: relative;
+}
+.entity-modal .pane-image .hero::after {
+  content: "";
+  position: absolute; inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to bottom, rgba(0,0,0,0.40) 0%, rgba(0,0,0,0) 90px),
+    linear-gradient(to top,    rgba(0,0,0,0.58) 0%, rgba(0,0,0,0.30) 22%, rgba(0,0,0,0) 38%),
+    radial-gradient(120% 80% at 50% 38%, transparent 0%, rgba(0,0,0,0.22) 78%, rgba(0,0,0,0.40) 100%);
+}
+.entity-modal .pane-image .id-strip {
+  padding: 16px 22px;
+  border-top: 1px solid var(--fg-ghost);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  background: #000;
+}
+.entity-modal .id-strip .row { display: flex; justify-content: space-between; gap: 14px; padding: 3px 0; }
+.entity-modal .id-strip .k { color: var(--fg-dim); text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px; }
+.entity-modal .id-strip .v { color: var(--fg); }
+.entity-modal .id-strip .v.thin { color: var(--fg-mid); }
+.entity-modal .id-strip .hash { letter-spacing: 0.02em; }
+
+/* ---------- Right: comparisons ---------- */
+.entity-modal .pane-data {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.entity-modal .pane-data .head {
+  padding: 20px 32px;
+  border-bottom: 1px solid var(--fg-ghost);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.entity-modal .pane-data h1 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--fg);
+}
+.entity-modal .pane-data h1 .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.entity-modal .pane-data h1 .sub { color: var(--fg-mid); font-family: var(--font-mono); font-size: 12px; padding-left: 12px; letter-spacing: 0; }
+.entity-modal .pane-data .close {
+  background: transparent; border: 0; padding: 0; cursor: pointer;
+  color: var(--fg-mid);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+.entity-modal .pane-data .close:hover { color: var(--fg); }
+
+.entity-modal .pane-data .ambient {
+  padding: 14px 32px 0;
+  color: var(--fg-mid);
+  font-size: 13px;
+  max-width: 60ch;
+  line-height: 1.55;
+}
+
+.entity-modal .modal-work {
+  margin: 6px 32px 0;
+}
+.entity-modal .modal-error {
+  margin: 8px 32px 0;
+  color: var(--fg-mid);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.entity-modal .modal-consent {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--fg);
+  margin: 10px 32px 0;
+  max-width: 60ch;
+}
+.entity-modal .modal-consent .pip {
+  display: inline-block;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--fg-mid);
+  flex-shrink: 0;
+  align-self: center;
+}
+.entity-modal .modal-consent .label { color: var(--fg); }
+.entity-modal .modal-consent .consent-action {
+  background: transparent; border: 0; padding: 0; margin: 0;
+  font: inherit;
+  color: var(--fg);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.entity-modal .modal-consent .consent-action.ghost { color: var(--fg-dim); }
+.entity-modal .modal-consent .consent-action:hover { color: var(--fg); }
+
+.entity-modal .pane-data .matrix-wrap {
+  overflow: auto;
+  padding: 18px 32px 18px;
+}
+
+/* 7 trait rows x N entity columns. Trait label column sticky-left so the
+   row identity stays visible if the modal is narrower than the full
+   strip width on smaller viewports. */
+.entity-modal .matrix {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+.entity-modal .matrix th, .entity-modal .matrix td {
+  text-align: center;
+  font-weight: 400;
+  padding: 5px 0;
+}
+.entity-modal .matrix thead th {
+  color: var(--fg-dim);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  padding: 0 2px 8px;
+  width: 1.6em;
+  cursor: pointer;
+  user-select: none;
+  position: sticky;
+  top: 0;
+  background: #000;
+}
+.entity-modal .matrix thead th:hover { color: var(--fg-mid); }
+.entity-modal .matrix thead th:first-child {
+  text-align: left;
+  padding: 0 14px 8px 0;
+  width: 5em;
+  color: var(--fg-dim);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: default;
+  position: sticky;
+  left: 0;
+  background: #000;
+  z-index: 2;
+}
+.entity-modal .matrix thead th.col-full { color: var(--fg); }
+
+.entity-modal .matrix tbody th {
+  text-align: left;
+  color: var(--fg-mid);
+  width: 5em;
+  padding: 5px 14px 5px 0;
+  cursor: pointer;
+  user-select: none;
+  position: sticky;
+  left: 0;
+  background: #000;
+}
+.entity-modal .matrix tbody th:hover { color: var(--fg); }
+.entity-modal .matrix tbody th .ratio { color: var(--fg-faint); font-size: 11px; padding-left: 6px; }
+
+.entity-modal .matrix td.cell {
+  color: var(--fg-faint);
+  cursor: pointer;
+  width: 1.6em;
+  user-select: none;
+  transition: color .12s ease;
+}
+.entity-modal .matrix td.cell:hover { color: var(--fg-dim); }
+.entity-modal .matrix td.cell.r { color: var(--fg); cursor: default; }
+.entity-modal .matrix td.cell.busy {
+  color: var(--fg-mid);
+  animation: cell-pulse 0.8s ease-in-out infinite;
+  cursor: default;
+}
+.entity-modal .matrix td.cell.flash { animation: cell-flash 0.9s ease-out; }
+.entity-modal .matrix tbody tr:hover td.cell:not(.r) { color: var(--fg-dim); }
+
+.entity-modal .pane-data .stream-strip {
+  border-top: 1px solid var(--fg-ghost);
+  padding: 14px 32px;
+  background: #050505;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--fg-mid);
+  flex: 1;
+  overflow-y: auto;
+}
+.entity-modal .stream-strip .lab { color: var(--fg-dim); text-transform: uppercase; letter-spacing: 0.08em; font-size: 11px; margin-bottom: 6px; }
+.entity-modal .stream-strip .row {
+  display: grid;
+  grid-template-columns: 5em 4em 1.5em 4em 5em 1fr;
+  column-gap: 12px;
+  align-items: baseline;
+  color: var(--fg);
+  line-height: 1.85;
+}
+.entity-modal .stream-strip .row.empty { color: var(--fg-faint); display: block; }
+.entity-modal .stream-strip .ts  { color: var(--fg-dim); }
+.entity-modal .stream-strip .a, .entity-modal .stream-strip .b { color: var(--fg); }
+.entity-modal .stream-strip .op  { color: var(--fg); text-align: center; }
+.entity-modal .stream-strip .tr  { color: var(--fg-mid); }
+.entity-modal .stream-strip .by  { color: var(--fg-dim); }
+
+.entity-modal .pane-data .foot {
+  border-top: 1px solid var(--fg-ghost);
+  padding: 10px 32px;
+  color: var(--fg-faint);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+/* ---------- Mobile (single column, full-bleed) ----------
+   Below ~768px the side-by-side layout stops working: the right pane
+   would have ~250px and the matrix needs to scroll horizontally. So
+   we stack — image on top, compact inline id-strip below it, then
+   the data pane scrolls vertically as a whole with the matrix
+   scrolling horizontally inside it. The modal becomes the viewport.
+*/
+@media (max-width: 768px) {
+  .entity-modal {
+    top: 0; left: 0;
+    transform: none;
+    width: 100vw;
+    height: 100vh;
+    max-width: none;
+    max-height: none;
+    border: 0;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .entity-modal .pane-image {
+    border-right: 0;
+    border-bottom: 1px solid var(--fg-ghost);
+  }
+  .entity-modal .pane-image .hero {
+    flex: 0 0 auto;
+    aspect-ratio: auto;
+    height: 38vh;
+    min-height: 220px;
+  }
+  /* Compact inline id-strip: horizontal pairs that wrap, not stacked rows. */
+  .entity-modal .pane-image .id-strip {
+    padding: 10px 18px 12px;
+    font-size: 11px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+    line-height: 1.5;
+  }
+  .entity-modal .pane-image .id-strip .row {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 6px;
+    padding: 0;
+    justify-content: flex-start;
+  }
+  .entity-modal .pane-image .id-strip .v.thin { font-size: 10.5px; }
+
+  .entity-modal .pane-data {
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+  .entity-modal .pane-data .head {
+    padding: 14px 18px;
+    position: sticky;
+    top: 0;
+    background: #000;
+    z-index: 5;
+  }
+  .entity-modal .pane-data h1 { display: flex; flex-direction: column; gap: 2px; }
+  .entity-modal .pane-data h1 .sub { padding-left: 0; font-size: 11.5px; }
+  .entity-modal .pane-data .close { align-self: flex-start; padding: 4px 0 4px 12px; }
+  .entity-modal .pane-data .ambient { padding: 12px 18px 0; font-size: 12.5px; }
+  .entity-modal .modal-work,
+  .entity-modal .modal-error,
+  .entity-modal .modal-consent { margin-left: 18px; margin-right: 18px; }
+  .entity-modal .pane-data .matrix-wrap {
+    padding: 14px 18px;
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+  }
+  .entity-modal .pane-data .stream-strip {
+    flex: 0 0 auto;
+    max-height: none;
+    padding: 12px 18px;
+  }
+  .entity-modal .stream-strip .row {
+    grid-template-columns: 5em 3.5em 1.25em 3.5em 4em 1fr;
+  }
+  .entity-modal .pane-data .foot { padding: 10px 18px; }
+}
+
+/* Even narrower phones: tighter cells, drop the "by" column from stream */
+@media (max-width: 420px) {
+  .entity-modal .pane-image .hero { height: 34vh; min-height: 200px; }
+  .entity-modal .matrix thead th { width: 1.4em; font-size: 10px; padding: 0 1px 8px; }
+  .entity-modal .matrix td.cell { width: 1.4em; }
+  .entity-modal .matrix tbody th {
+    width: 4.5em;
+    padding-right: 10px;
+    font-size: 12px;
+  }
+  .entity-modal .matrix tbody th .ratio { display: block; padding: 0; font-size: 10.5px; line-height: 1; }
+  .entity-modal .stream-strip .row {
+    grid-template-columns: 4em 3em 1.25em 3em 4em;
+  }
+  .entity-modal .stream-strip .row .by { display: none; }
+  .entity-modal .pane-data .foot { font-size: 10.5px; }
 }
 
 /* ------------------------------------------------------------------ */

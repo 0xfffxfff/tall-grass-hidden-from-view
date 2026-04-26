@@ -1,13 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useAccount, usePublicClient } from "wagmi";
-import { type Hex } from "viem";
-import { APP_CHAIN } from "@/chain";
-import {
-  tallGrassAbi,
-  tallGrassAddress,
-  useWatchTallGrassMintedEvent,
-  useWatchTallGrassTransferEvent,
-} from "@/generated";
+import { useMemo, useState } from "react";
+import { useAccount } from "wagmi";
+import { useTokens } from "@/hooks/useTokens";
 import { pad2, shortAddr } from "./monolithLib";
 
 interface Props {
@@ -15,70 +8,67 @@ interface Props {
   onSelectEntity: (id: number) => void;
 }
 
-const TG_ADDR = tallGrassAddress[APP_CHAIN.id as keyof typeof tallGrassAddress] as Hex;
+// Entity #0 is reserved as the artist's proof and stays visible from day one.
+// Owner label is hardcoded — even if the chain shows a different address (e.g.
+// during local dev before artistMint runs), the canonical credit is 0xfff.eth.
+const ARTIST_PROOF_ID = 0;
+const ARTIST_PROOF_OWNER_LABEL = "0xfff.eth";
 
 type Mode = "all" | "mine";
 
 export function EntityRegistry({ entityCount, onSelectEntity }: Props) {
   const { address, isConnected } = useAccount();
-  const publicClient = usePublicClient();
-  const [owners, setOwners] = useState<(string | null)[]>([]);
-  const [scanning, setScanning] = useState(true);
+  const { tokens, loading } = useTokens();
   const [mode, setMode] = useState<Mode>("all");
 
   const me = address?.toLowerCase();
 
-  const scan = useCallback(async () => {
-    if (!publicClient || entityCount === 0) {
-      setOwners([]);
-      setScanning(false);
-      return;
-    }
-    const results = await Promise.allSettled(
-      Array.from({ length: entityCount }, (_, i) =>
-        publicClient.readContract({
-          abi: tallGrassAbi,
-          address: TG_ADDR,
-          functionName: "ownerOf",
-          args: [BigInt(i)],
-        }),
-      ),
-    );
-    const next: (string | null)[] = results.map((r) =>
-      r.status === "fulfilled" && typeof r.value === "string" ? r.value : null,
-    );
-    setOwners(next);
-    setScanning(false);
-  }, [publicClient, entityCount]);
+  // Always iterate the full 0..entityCount-1 range so the grid shows
+  // every entity regardless of mint state. Unminted ids get a veiled
+  // tile and a "to be revealed" owner label. The token map is keyed by
+  // id; missing ids fall through to defaults.
+  const tokenById = useMemo(() => {
+    const m = new Map<number, (typeof tokens)[number]>();
+    for (const t of tokens) m.set(t.id, t);
+    return m;
+  }, [tokens]);
 
-  useEffect(() => {
-    setScanning(true);
-    scan();
-  }, [scan]);
-
-  // Refetch on chain events that change ownership.
-  useWatchTallGrassMintedEvent({ onLogs: () => scan() });
-  useWatchTallGrassTransferEvent({ onLogs: () => scan() });
-
-  const mintedCount = owners.filter((o) => o !== null).length;
-
-  const rows = useMemo(() => {
-    const out: { id: number; owner: string | null; mine: boolean }[] = [];
+  const tiles = useMemo(() => {
+    const out: {
+      id: number;
+      owner: string | null;
+      mine: boolean;
+      revealed: boolean;
+      ownerLabel: string | null;
+    }[] = [];
     for (let id = 0; id < entityCount; id++) {
-      const owner = owners[id] ?? null;
+      const t = tokenById.get(id);
+      const owner = t?.owner ?? null;
+      const minted = !!t?.minted;
       const mine = !!owner && !!me && owner.toLowerCase() === me;
+      const isArtistProof = id === ARTIST_PROOF_ID;
+      const revealed = isArtistProof || minted;
+      const ownerLabel = isArtistProof
+        ? ARTIST_PROOF_OWNER_LABEL
+        : owner
+          ? shortAddr(owner)
+          : null;
       if (mode === "mine" && !mine) continue;
-      out.push({ id, owner, mine });
+      out.push({ id, owner, mine, revealed, ownerLabel });
     }
     return out;
-  }, [owners, entityCount, mode, me]);
+  }, [tokenById, entityCount, mode, me]);
+
+  const mintedCount = tokens.filter((t) => t.minted).length;
 
   return (
     <section className="registry">
       <h2>entities</h2>
       <p>
-        Every entity in the landscape, and who holds it. Unminted entities
-        remain hidden until a visitor encounters them.
+        Thirty-two entities live in the landscape. Each remains hidden until a
+        visitor encounters and mints it &mdash; only then does its likeness
+        appear here. Entity #00 is the artist&rsquo;s proof, kept by the
+        artist.
       </p>
 
       <div className="registry-bar">
@@ -105,35 +95,60 @@ export function EntityRegistry({ entityCount, onSelectEntity }: Props) {
         </span>
       </div>
 
-      {scanning && owners.length === 0 ? (
-        <p className="why">scanning landscape&hellip;</p>
-      ) : rows.length === 0 ? (
+      {tiles.length === 0 ? (
         <p className="why">
           {mode === "mine"
             ? "You hold no entities yet."
-            : "No entities have been minted yet."}
+            : loading
+              ? "scanning landscape\u2026"
+              : "No entities yet."}
         </p>
       ) : (
-        <ul className="registry-list">
-          {rows.map(({ id, owner, mine }) => (
-            <li key={id} className={owner ? "minted" : "unminted"}>
-              <button
-                className="entity-id"
-                onClick={() => onSelectEntity(id)}
-                title="open in drilldown"
+        <ul className="registry-grid">
+          {tiles.map(({ id, mine, revealed, ownerLabel }) => {
+            const isArtistProof = id === ARTIST_PROOF_ID;
+            return (
+              <li
+                key={id}
+                className={
+                  "tile" +
+                  (revealed ? " revealed" : " veiled") +
+                  (mine ? " mine" : "") +
+                  (isArtistProof ? " artist-proof" : "")
+                }
               >
-                #{pad2(id)}
-              </button>
-              {owner ? (
-                <>
-                  <span className="owner">{shortAddr(owner)}</span>
-                  {mine && <span className="me">(you)</span>}
-                </>
-              ) : (
-                <span className="owner-empty">in the landscape</span>
-              )}
-            </li>
-          ))}
+                <button
+                  className="tile-button"
+                  onClick={() => onSelectEntity(id)}
+                  title={
+                    revealed
+                      ? `open entity #${pad2(id)}`
+                      : `entity #${pad2(id)} — to be revealed`
+                  }
+                >
+                  <span className="tile-image">
+                    {revealed ? (
+                      <img
+                        src={`/previews/${id}.jpg`}
+                        alt={`entity #${pad2(id)}`}
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <span className="tile-veil" aria-hidden="true" />
+                    )}
+                  </span>
+                  <span className="tile-meta">
+                    <span className="tile-id">#{pad2(id)}</span>
+                    <span className="tile-owner">
+                      {ownerLabel ?? "to be revealed"}
+                      {mine && <span className="me"> (you)</span>}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>
