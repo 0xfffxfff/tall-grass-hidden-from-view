@@ -415,7 +415,7 @@ contract TallGrassTest is Test {
 
         vm.deal(alice, 1 ether);
         vm.prank(alice);
-        vm.expectRevert(TallGrass.InsufficientPayment.selector);
+        vm.expectRevert(TallGrass.IncorrectPayment.selector);
         tg2.mint{value: 0.1 ether}(entityId, hex"", traitCID, initPos, bsc, proof);
     }
 
@@ -510,6 +510,29 @@ contract TallGrassTest is Test {
         vm.prank(alice);
         vm.expectRevert();
         tg.setMetadataContract(address(0x999));
+    }
+
+    // -----------------------------------------------------------------------
+    // setMintPrice
+    // -----------------------------------------------------------------------
+
+    function test_setMintPrice() public {
+        uint256 newPrice = 0.5 ether;
+        uint256 oldPrice = tg.mintPrice();
+
+        vm.expectEmit(false, false, false, true);
+        emit TallGrass.MintPriceUpdated(oldPrice, newPrice);
+
+        vm.prank(owner);
+        tg.setMintPrice(newPrice);
+
+        assertEq(tg.mintPrice(), newPrice);
+    }
+
+    function test_setMintPrice_revert_not_owner() public {
+        vm.prank(alice);
+        vm.expectRevert();
+        tg.setMintPrice(0.5 ether);
     }
 
     function test_tokenURI_delegates_to_metadata() public {

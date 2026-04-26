@@ -22,7 +22,7 @@ contract TallGrass is ERC721, OwnableRoles {
     error EntityAlreadyMinted();
     error InvalidProof();
     error InvalidTraitProof();
-    error InsufficientPayment();
+    error IncorrectPayment();
     error InsufficientDeposit();
     error WithdrawFailed();
     error ReimbursementFailed();
@@ -38,6 +38,7 @@ contract TallGrass is ERC721, OwnableRoles {
     event Deposited(address indexed participant, uint256 amount, uint256 totalBalance);
     event DepositWithdrawn(address indexed participant, uint256 amount);
     event DepositDepleted(address indexed participant);
+    event MintPriceUpdated(uint256 oldPrice, uint256 newPrice);
 
     // ERC-4906
     event MetadataUpdate(uint256 _tokenId);
@@ -64,7 +65,7 @@ contract TallGrass is ERC721, OwnableRoles {
     uint256 public immutable gridWidth;
     uint256 public immutable gridHeight;
     uint256 public immutable totalSupply;
-    uint256 public immutable mintPrice;
+    uint256 public mintPrice;
     IVerifier public immutable movementVerifier;
     IVerifier public immutable entityMovementVerifier;
     IVerifier public immutable encounterVerifier;
@@ -172,6 +173,11 @@ contract TallGrass is ERC721, OwnableRoles {
 
     function sEP(uint256 eId, address p) external onlyOwner {
         eP[eId] = p;
+    }
+
+    function setMintPrice(uint256 _mintPrice) external onlyOwner {
+        emit MintPriceUpdated(mintPrice, _mintPrice);
+        mintPrice = _mintPrice;
     }
 
     // -----------------------------------------------------------------------
@@ -356,7 +362,7 @@ contract TallGrass is ERC721, OwnableRoles {
         bytes32[] calldata traitMerkleProof
     ) external payable {
         if (entityMinted[entityId]) revert EntityAlreadyMinted();
-        if (msg.value < mintPrice) revert InsufficientPayment();
+        if (msg.value != mintPrice) revert IncorrectPayment();
 
         // Verify encounter proof
         bytes32[] memory publicInputs = new bytes32[](7);
