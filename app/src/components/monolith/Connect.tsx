@@ -34,13 +34,16 @@ export function Connect() {
   if (visible.length === 1) {
     const c = visible[0];
     const pending = isPending && pendingUid === c.uid;
+    const label = c.name.toLowerCase() === "injected"
+      ? "connect wallet"
+      : `connect ${c.name.toLowerCase()}`;
     return (
       <button
         className="aff live"
         disabled={isPending}
         onClick={() => connect({ connector: c })}
       >
-        {pending ? "connecting\u2026" : `connect ${c.name.toLowerCase()}`}
+        {pending ? "connecting\u2026" : label}
       </button>
     );
   }
