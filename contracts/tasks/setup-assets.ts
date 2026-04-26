@@ -18,24 +18,15 @@ import fs from "fs";
 //               npx hardhat view-token --id 0 --network localhost
 
 const DEFAULT_HTML = "../app/dist/onchain/full.html";
-const DEFAULT_PREVIEWS = "../previews/onchain";
+const DEFAULT_PREVIEWS = "../previews/onchain/1x1";
 const DEFAULT_DATA = "../app/data";
 
 task("setup-assets", "Upload HTML viewer + per-entity previews + ciphertexts to TallGrassMetadata")
   .addOptionalParam("html", "Path to built full.html", DEFAULT_HTML)
-  .addOptionalParam(
-    "previews",
-    "Root dir containing {1x1,2x3,9x16}/{id}.jpg",
-    DEFAULT_PREVIEWS,
-  )
+  .addOptionalParam("previews", "Directory containing {id}.jpg files", DEFAULT_PREVIEWS)
   .addOptionalParam("data", "App data dir with entities/<id>.bin and manifest.json", DEFAULT_DATA)
   .addOptionalParam("from", "First entity id (inclusive)", 0, types.int)
   .addOptionalParam("to", "Last entity id (inclusive)", 31, types.int)
-  .addOptionalParam(
-    "aspects",
-    "Comma-separated aspect names to upload (default: 1x1 only — fastest path)",
-    "1x1",
-  )
   .addFlag("skipHtml", "Skip the HTML viewer upload")
   .addFlag("skipImages", "Skip the per-entity image uploads")
   .addFlag("skipCiphertexts", "Skip the per-entity ciphertext uploads")
@@ -44,7 +35,6 @@ task("setup-assets", "Upload HTML viewer + per-entity previews + ciphertexts to 
     const fromId = Number(taskArgs.from);
     const toId = Number(taskArgs.to);
 
-    // ---- HTML viewer ------------------------------------------------------
     if (!taskArgs.skipHtml) {
       const htmlPath = path.resolve(taskArgs.html);
       if (!fs.existsSync(htmlPath)) {
@@ -68,23 +58,20 @@ task("setup-assets", "Upload HTML viewer + per-entity previews + ciphertexts to 
       }
     }
 
-    // ---- Per-entity images ------------------------------------------------
     if (!taskArgs.skipImages) {
       const previewsRoot = path.resolve(taskArgs.previews);
       if (!fs.existsSync(previewsRoot)) {
         console.warn(`\n[images] ${previewsRoot} not found — skipping`);
       } else {
-        console.log(`\n[images] uploading ids ${fromId}..${toId} (aspects: ${taskArgs.aspects})`);
+        console.log(`\n[images] uploading ids ${fromId}..${toId} from ${previewsRoot}`);
         await hre.run("upload-entity-images", {
           dir: previewsRoot,
           from: fromId,
           to: toId,
-          aspects: taskArgs.aspects,
         });
       }
     }
 
-    // ---- Per-entity ciphertexts ------------------------------------------
     if (!taskArgs.skipCiphertexts) {
       const dataDir = path.resolve(taskArgs.data);
       const entitiesDir = path.join(dataDir, "entities");

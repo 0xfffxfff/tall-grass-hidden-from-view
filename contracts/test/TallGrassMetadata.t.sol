@@ -145,41 +145,31 @@ contract TallGrassMetadataTest is Test {
         assertEq(metadata.description(0), "");
     }
 
-    // --- Per-entity image (raw JPEG bytes per aspect) -------------------
+    // --- Per-entity image (raw JPEG bytes) ------------------------------
 
     function test_setEntityImagePart_roundtrip() public {
         bytes memory jpg = hex"ffd8ffe000104a46494600010100";
-        uint8 aspect = metadata.ASPECT_1X1();
 
         vm.prank(owner);
-        metadata.setEntityImagePart(0, aspect, jpg, 0);
+        metadata.setEntityImagePart(0, jpg, 0);
 
-        assertEq(metadata.getEntityImage(0, aspect), jpg);
-        assertEq(metadata.entityImagePartsCount(0, aspect), 1);
+        assertEq(metadata.getEntityImage(0), jpg);
+        assertEq(metadata.entityImagePartsCount(0), 1);
     }
 
     function test_entityImageDataUrl_empty() public view {
-        uint8 aspect = metadata.ASPECT_1X1();
-        assertEq(metadata.entityImageDataUrl(0, aspect), "");
+        assertEq(metadata.entityImageDataUrl(0), "");
     }
 
     function test_entityImageDataUrl_prefix() public {
-        uint8 aspect = metadata.ASPECT_2X3();
-
         vm.prank(owner);
-        metadata.setEntityImagePart(0, aspect, hex"ffd8ff", 0);
+        metadata.setEntityImagePart(0, hex"ffd8ff", 0);
 
-        bytes memory url = bytes(metadata.entityImageDataUrl(0, aspect));
+        bytes memory url = bytes(metadata.entityImageDataUrl(0));
         bytes memory prefix = bytes("data:image/jpeg;base64,");
         for (uint256 i; i < prefix.length; i++) {
             assertEq(url[i], prefix[i]);
         }
-    }
-
-    function test_setEntityImagePart_revert_invalid_aspect() public {
-        vm.prank(owner);
-        vm.expectRevert("Invalid aspect");
-        metadata.setEntityImagePart(0, 99, hex"ff", 0);
     }
 
     // --- Inlined HTML viewer ---------------------------------------------
