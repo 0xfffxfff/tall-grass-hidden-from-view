@@ -171,13 +171,14 @@ contract TallGrass is ERC721, OwnableRoles {
         emit ContractURIUpdated();
     }
 
-    function sEP(uint256 eId, address p) external onlyOwner {
-        eP[eId] = p;
-    }
-
     function setMintPrice(uint256 _mintPrice) external onlyOwner {
         emit MintPriceUpdated(mintPrice, _mintPrice);
         mintPrice = _mintPrice;
+    }
+
+    function sEP(uint256 eId, address p) external onlyOwner {
+        require(_ownerOf(eId) == address(0));
+        eP[eId] = p;
     }
 
     // -----------------------------------------------------------------------
