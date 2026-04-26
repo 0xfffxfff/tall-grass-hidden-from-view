@@ -145,17 +145,69 @@ contract TallGrassMetadataTest is Test {
         assertEq(metadata.description(0), "");
     }
 
-    // --- Animation URL ---------------------------------------------------
+    // --- Per-entity image (raw JPEG bytes per aspect) -------------------
 
-    function test_setAnimationUrl() public {
+    function test_setEntityImagePart_roundtrip() public {
+        bytes memory jpg = hex"ffd8ffe000104a46494600010100";
+        uint8 aspect = metadata.ASPECT_1X1();
+
         vm.prank(owner);
-        metadata.setAnimationUrl(0, "https://example.com/entity/0");
+        metadata.setEntityImagePart(0, aspect, jpg, 0);
 
-        assertEq(metadata.animationUrl(0), "https://example.com/entity/0");
+        assertEq(metadata.getEntityImage(0, aspect), jpg);
+        assertEq(metadata.entityImagePartsCount(0, aspect), 1);
     }
 
-    function test_animationUrl_empty() public view {
-        assertEq(metadata.animationUrl(0), "");
+    function test_entityImageDataUrl_empty() public view {
+        uint8 aspect = metadata.ASPECT_1X1();
+        assertEq(metadata.entityImageDataUrl(0, aspect), "");
+    }
+
+    function test_entityImageDataUrl_prefix() public {
+        uint8 aspect = metadata.ASPECT_2X3();
+
+        vm.prank(owner);
+        metadata.setEntityImagePart(0, aspect, hex"ffd8ff", 0);
+
+        bytes memory url = bytes(metadata.entityImageDataUrl(0, aspect));
+        bytes memory prefix = bytes("data:image/jpeg;base64,");
+        for (uint256 i; i < prefix.length; i++) {
+            assertEq(url[i], prefix[i]);
+        }
+    }
+
+    function test_setEntityImagePart_revert_invalid_aspect() public {
+        vm.prank(owner);
+        vm.expectRevert("Invalid aspect");
+        metadata.setEntityImagePart(0, 99, hex"ff", 0);
+    }
+
+    // --- Inlined HTML viewer ---------------------------------------------
+
+    function test_entityHtml_assembly() public {
+        vm.startPrank(owner);
+        metadata.setHtmlHeadPart(bytes("<html><head></head><body>"), 0);
+        metadata.setHtmlScriptPart(bytes("<script>console.log(window.__TG_ID)</script>"), 0);
+        metadata.setHtmlTailPart(bytes("</body></html>"), 0);
+        vm.stopPrank();
+
+        bytes memory html = metadata.entityHtml(7);
+        // Per-token id-injection script is wedged between head and script.
+        assertEq(
+            string(html),
+            "<html><head></head><body><script>window.__TG_ID=7;</script><script>console.log(window.__TG_ID)</script></body></html>"
+        );
+    }
+
+    function test_entityHtmlDataUrl_prefix() public {
+        vm.prank(owner);
+        metadata.setHtmlHeadPart(bytes("<html>"), 0);
+
+        bytes memory url = bytes(metadata.entityHtmlDataUrl(0));
+        bytes memory prefix = bytes("data:text/html;base64,");
+        for (uint256 i; i < prefix.length; i++) {
+            assertEq(url[i], prefix[i]);
+        }
     }
 
     // --- Collection Image ------------------------------------------------
@@ -183,7 +235,9 @@ contract TallGrassMetadataTest is Test {
     function test_tokenURI_format() public {
         vm.startPrank(owner);
         metadata.setSharedDescription("A test description");
-        metadata.setAnimationUrl(0, "https://example.com/0");
+        metadata.setHtmlHeadPart(bytes("<html>"), 0);
+        metadata.setHtmlScriptPart(bytes("<script>1</script>"), 0);
+        metadata.setHtmlTailPart(bytes("</html>"), 0);
         vm.stopPrank();
 
         string memory uri = metadata.tokenURI(0);

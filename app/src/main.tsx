@@ -24,10 +24,22 @@ function readLockedEntityId(): number | undefined {
   if (!Number.isInteger(parsed) || parsed < 0 || parsed > 31) return undefined;
   return parsed;
 }
+// /full?zoom=X overrides the default world-space zoom (1.4). Useful for
+// preview rendering where a wider field flatters the per-entity slab.
+// Clamped to a sane range.
+function readZoomOverride(): number | undefined {
+  if (!isFull) return undefined;
+  const z = new URLSearchParams(window.location.search).get("zoom");
+  if (z === null) return undefined;
+  const parsed = Number.parseFloat(z);
+  if (!Number.isFinite(parsed) || parsed < 0.3 || parsed > 3.0) return undefined;
+  return parsed;
+}
 const lockedEntityId = readLockedEntityId();
+const zoomOverride = readZoomOverride();
 
 function Root() {
-  if (isFull) return <FullPage entityId={lockedEntityId} />;
+  if (isFull) return <FullPage entityId={lockedEntityId} zoom={zoomOverride} />;
   if (reportSlug) return <Report slug={reportSlug} />;
   return <App />;
 }

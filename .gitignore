@@ -22,4 +22,7 @@ TODO.md
 # private working materials — kept locally, not in repo
 references/
 context/
-previews/
+previews/*
+# ...except the on-chain preview JPGs, which are uploaded to the
+# metadata contract and should travel with the source.
+!previews/onchain/

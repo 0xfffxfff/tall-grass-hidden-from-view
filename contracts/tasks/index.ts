@@ -5,6 +5,7 @@ import "./withdraw";
 import "./set-metadata-contract";
 import "./set-description";
 import "./set-image";
-import "./set-animation-url";
 import "./upload-ciphertext";
+import "./upload-entity-image";
+import "./upload-html";
 import "./view-token";

@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "wagmi generate && vite build && node scripts/prerender-reports.mjs",
     "server": "tsx server.ts",
-    "typecheck:server": "tsc --watch --noEmit -p tsconfig.server.json"
+    "typecheck:server": "tsc --watch --noEmit -p tsconfig.server.json",
+    "render-previews": "node scripts/render-onchain-previews.mjs",
+    "build:onchain": "node scripts/build-onchain.mjs"
   },
   "dependencies": {
     "@aztec/bb.js": "2.1.11",
@@ -37,7 +39,10 @@
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.0",
     "@wagmi/cli": "^2.10.0",
+    "esbuild": "^0.25.12",
     "postcss": "^8.5.6",
+    "puppeteer": "^23.0.0",
+    "sharp": "^0.33.0",
     "tailwindcss": "^4.1.18",
     "tsx": "^4.21.0",
     "typescript": "^5.7.0",

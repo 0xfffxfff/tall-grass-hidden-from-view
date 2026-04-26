@@ -33,6 +33,35 @@ library Metadata {
         return _encodeJSON(metadata);
     }
 
+    /// @notice Token metadata with both `image` (preview) and `animation_url`
+    ///         (interactive viewer). Either may be the empty string.
+    function encodeTokenMetadata(
+        uint256 _tokenId,
+        string memory _name,
+        string memory _description,
+        string memory _attributes,
+        string memory _image,
+        string memory _animationUrl
+    ) internal pure returns (string memory) {
+        string memory metadata = string.concat(
+            "{",
+            keyValue("tokenId", LibString.toString(_tokenId)),
+            ",",
+            keyValue("name", _name),
+            ",",
+            keyValue("description", _description),
+            ",",
+            keyValueNoQuotes("attributes", _attributes),
+            ",",
+            keyValue("image", _image),
+            ",",
+            keyValue("animation_url", _animationUrl),
+            "}"
+        );
+
+        return _encodeJSON(metadata);
+    }
+
     /// @notice String values must not contain ", \, or control characters.
     ///         No escaping is performed — invalid characters will produce broken JSON.
     function encodeContractMetadata(

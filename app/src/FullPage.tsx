@@ -16,9 +16,10 @@ import { Stage } from "@/components/monolith/Stage";
 // changes is that the field is reduced to one signature.
 interface FullPageProps {
   entityId?: number;
+  zoom?: number;
 }
 
-export function FullPage({ entityId }: FullPageProps) {
+export function FullPage({ entityId, zoom = 1.4 }: FullPageProps) {
   useEffect(() => {
     document.body.classList.add("full-mode");
     return () => {
@@ -26,5 +27,5 @@ export function FullPage({ entityId }: FullPageProps) {
     };
   }, []);
 
-  return <Stage className="stage-full" zoom={1.4} entityId={entityId} />;
+  return <Stage className="stage-full" zoom={zoom} entityId={entityId} />;
 }
