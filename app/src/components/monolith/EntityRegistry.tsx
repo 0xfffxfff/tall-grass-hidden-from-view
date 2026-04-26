@@ -122,15 +122,15 @@ export function EntityRegistry({ entityCount, onSelectEntity }: Props) {
                   onClick={() => onSelectEntity(id)}
                   title={
                     revealed
-                      ? `open entity #${pad2(id)}`
-                      : `entity #${pad2(id)} — to be revealed`
+                      ? `open Entity #${pad2(id)}`
+                      : `Entity #${pad2(id)} — to be revealed`
                   }
                 >
                   <span className="tile-image">
                     {revealed ? (
                       <img
                         src={`/previews/${id}.jpg`}
-                        alt={`entity #${pad2(id)}`}
+                        alt={`Entity #${pad2(id)}`}
                         loading="lazy"
                         decoding="async"
                       />

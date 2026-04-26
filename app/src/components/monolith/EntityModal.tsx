@@ -9,7 +9,7 @@
 // from the metadata contract whose address lives behind the TallGrass
 // `metadataContract()` getter.
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useReadContract } from "wagmi";
 import { isAddress, type Address } from "viem";
 import {
@@ -32,10 +32,13 @@ import { type RevealRecord } from "@/api";
 const ARTIST_PROOF_ID = 0;
 const ARTIST_PROOF_OWNER_LABEL = "0xfff.eth";
 
-// Hero zoom for the embedded /full route. Matches the per-aspect zoom
-// used by the on-chain preview render script for 9:16 (so the hero
-// reads at the same framing as the static JPG fallback below it).
-const HERO_ZOOM = 1.15;
+// Hero zoom for the embedded /full route. Desktop matches the on-chain
+// 9:16 preview render. Mobile pulls the camera further out — the hero
+// crops to ~390x320 (closer to landscape than 9:16), and the desktop
+// zoom would clip the slab.
+const HERO_ZOOM_DESKTOP = 1.15;
+const HERO_ZOOM_MOBILE = 0.8;
+const MOBILE_BREAKPOINT = "(max-width: 768px)";
 
 interface Props {
   entityId: number | null;
@@ -74,6 +77,21 @@ export function EntityModal({
 
   const closeBtnRef = useRef<HTMLButtonElement>(null);
 
+  // Responsive hero zoom — the iframe needs the value baked into its src
+  // URL, so we track it as state and re-mount on viewport changes.
+  const [heroZoom, setHeroZoom] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia(MOBILE_BREAKPOINT).matches
+      ? HERO_ZOOM_MOBILE
+      : HERO_ZOOM_DESKTOP,
+  );
+  useEffect(() => {
+    const mql = window.matchMedia(MOBILE_BREAKPOINT);
+    const update = () => setHeroZoom(mql.matches ? HERO_ZOOM_MOBILE : HERO_ZOOM_DESKTOP);
+    update();
+    mql.addEventListener("change", update);
+    return () => mql.removeEventListener("change", update);
+  }, []);
+
   // ESC closes; body scroll lock; focus the close button.
   useEffect(() => {
     if (!open) return;
@@ -86,8 +104,13 @@ export function EntityModal({
     document.addEventListener("keydown", onKey);
 
     // Focus the close button on next tick so it's reachable for keyboard
-    // users; nice-to-have, not essential.
-    const t = setTimeout(() => closeBtnRef.current?.focus(), 0);
+    // users; nice-to-have, not essential. preventScroll keeps the modal
+    // from auto-scrolling past the hero on mobile (where pane-data sits
+    // below the hero in the scroll flow).
+    const t = setTimeout(
+      () => closeBtnRef.current?.focus({ preventScroll: true }),
+      0,
+    );
 
     return () => {
       document.removeEventListener("keydown", onKey);
@@ -220,8 +243,8 @@ export function EntityModal({
                 />
                 <iframe
                   className="hero-frame"
-                  src={`/full?id=${entityId}&zoom=${HERO_ZOOM}`}
-                  title={`entity #${pad2(entityId)} live render`}
+                  src={`/full?id=${entityId}&zoom=${heroZoom}`}
+                  title={`Entity #${pad2(entityId)} live render`}
                   loading="eager"
                   sandbox="allow-scripts allow-same-origin"
                 />
@@ -251,7 +274,7 @@ export function EntityModal({
         <div className="pane-data">
           <div className="head">
             <h1>
-              entity <span className="num">#{pad2(entityId)}</span>
+              Entity <span className="num">#{pad2(entityId)}</span>
               <span className="sub">
                 {totalRevealedForEntity} of {totalSlots} traits compared
               </span>

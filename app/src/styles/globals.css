@@ -1279,6 +1279,7 @@ body.report-mode .titlebar { display: none; }
 .entity-modal .pane-data .close:hover { color: var(--fg); }
 
 .entity-modal .pane-data .ambient {
+  margin: 0;
   padding: 14px 32px 0;
   color: var(--fg-mid);
   font-size: 13px;
@@ -1462,20 +1463,25 @@ body.report-mode .titlebar { display: none; }
 */
 @media (max-width: 768px) {
   .entity-modal {
-    top: 0; left: 0;
+    top: 0; left: 0; right: 0; bottom: 0;
     transform: none;
     width: 100vw;
-    height: 100vh;
+    height: auto;
     max-width: none;
     max-height: none;
     border: 0;
     grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
   }
 
   .entity-modal .pane-image {
     border-right: 0;
     border-bottom: 1px solid var(--fg-ghost);
+    display: block;
+    overflow: visible;
   }
   .entity-modal .pane-image .hero {
     flex: 0 0 auto;
@@ -1502,16 +1508,11 @@ body.report-mode .titlebar { display: none; }
   .entity-modal .pane-image .id-strip .v.thin { font-size: 10.5px; }
 
   .entity-modal .pane-data {
-    overflow-y: auto;
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
+    overflow: visible;
+    min-width: 0;
   }
   .entity-modal .pane-data .head {
     padding: 14px 18px;
-    position: sticky;
-    top: 0;
-    background: #000;
-    z-index: 5;
   }
   .entity-modal .pane-data h1 { display: flex; flex-direction: column; gap: 2px; }
   .entity-modal .pane-data h1 .sub { padding-left: 0; font-size: 11.5px; }
