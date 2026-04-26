@@ -135,6 +135,49 @@ contract TallGrass is ERC721, OwnableRoles {
     }
 
     // -----------------------------------------------------------------------
+    // Bundled per-entity reads
+    // -----------------------------------------------------------------------
+
+    /// @notice Snapshot of all chain-side state for one entity. owner is
+    /// address(0) when the entity is not yet minted; the trait/position/
+    /// blinding fields are zero in that case as well.
+    struct TokenState {
+        address owner;
+        uint256 moveCount;
+        bytes32 traitHash;
+        bytes32 positionCommitment;
+        bytes32 blindingSeedCommitment;
+    }
+
+    /// @notice Bundled snapshot for a specific list of entity ids. One eth_call
+    /// instead of N per-field reads; useful for grids and drilldowns.
+    function tokenStates(uint256[] calldata ids) external view returns (TokenState[] memory out) {
+        out = new TokenState[](ids.length);
+        for (uint256 i = 0; i < ids.length; i++) {
+            out[i] = _tokenState(ids[i]);
+        }
+    }
+
+    /// @notice Bundled snapshot for every entity in the collection.
+    function allTokenStates() external view returns (TokenState[] memory out) {
+        uint256 n = totalSupply;
+        out = new TokenState[](n);
+        for (uint256 i = 0; i < n; i++) {
+            out[i] = _tokenState(i);
+        }
+    }
+
+    function _tokenState(uint256 id) internal view returns (TokenState memory) {
+        return TokenState({
+            owner: _ownerOf(id),
+            moveCount: entityMoveCount[id],
+            traitHash: entityTraitHash[id],
+            positionCommitment: entityPositionCommitments[id],
+            blindingSeedCommitment: entityBlindingSeedCommitments[id]
+        });
+    }
+
+    // -----------------------------------------------------------------------
     // ERC-721 overrides (solady)
     // -----------------------------------------------------------------------
 
@@ -395,6 +438,39 @@ contract TallGrass is ERC721, OwnableRoles {
         _mint(msg.sender, entityId);
 
         emit Minted(msg.sender, entityId, moveCounter, _entityTraitHash);
+    }
+
+    /// @notice Owner-only mint for artist proofs. Skips the encounter proof
+    /// and mint payment, but still binds the trait hash to the deployed entity
+    /// set via the trait Merkle tree, so the artist cannot mint a token with
+    /// arbitrary fake traits. Sets the same per-entity state as mint(), so
+    /// moveEntity continues to work for the artist proof if it is ever moved.
+    function artistMint(
+        uint256 entityId,
+        address to,
+        bytes32 _entityTraitHash,
+        bytes32 initialPositionCommitment,
+        bytes32 blindingSeedCommitment,
+        bytes32[] calldata traitMerkleProof
+    ) external onlyOwner {
+        if (entityMinted[entityId]) revert EntityAlreadyMinted();
+        if (totalMinted >= totalSupply) revert SupplyExhausted();
+
+        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(entityId, _entityTraitHash))));
+        if (!MerkleProofLib.verifyCalldata(traitMerkleProof, entityTraitMerkleRoot, leaf)) {
+            revert InvalidTraitProof();
+        }
+
+        entityMinted[entityId] = true;
+        entityTraitHash[entityId] = _entityTraitHash;
+        entityPositionCommitments[entityId] = initialPositionCommitment;
+        entityBlindingSeedCommitments[entityId] = blindingSeedCommitment;
+        entityMoveCount[entityId] = 0;
+        totalMinted++;
+
+        _mint(to, entityId);
+
+        emit Minted(to, entityId, moveCounter, _entityTraitHash);
     }
 
     // -----------------------------------------------------------------------

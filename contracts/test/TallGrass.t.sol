@@ -467,6 +467,129 @@ contract TallGrassTest is Test {
     }
 
     // -----------------------------------------------------------------------
+    // Artist mint (owner-only, no encounter proof, no payment)
+    // -----------------------------------------------------------------------
+
+    function test_artistMint() public {
+        uint256 entityId = 0;
+        bytes32 traitHash = bytes32(uint256(0xa17157));
+        bytes32 initPos = bytes32(uint256(0x1111));
+        bytes32 bsc = bytes32(uint256(0x2222));
+        (bytes32 traitRoot, bytes32[] memory proof) = _buildTraitTree(entityId, traitHash);
+        TallGrass tg2 = _deployWith(traitRoot);
+
+        // No registration, no payment, no encounter proof.
+        vm.prank(owner);
+        tg2.artistMint(entityId, alice, traitHash, initPos, bsc, proof);
+
+        assertTrue(tg2.entityMinted(entityId));
+        assertEq(tg2.ownerOf(entityId), alice);
+        assertEq(tg2.entityTraitHash(entityId), traitHash);
+        assertEq(tg2.entityPositionCommitments(entityId), initPos);
+        assertEq(tg2.entityBlindingSeedCommitments(entityId), bsc);
+        assertEq(tg2.entityMoveCount(entityId), 0);
+        assertEq(tg2.totalMinted(), 1);
+    }
+
+    function test_artistMint_revert_not_owner() public {
+        uint256 entityId = 0;
+        bytes32 traitHash = bytes32(uint256(0xa17157));
+        bytes32 initPos = bytes32(uint256(0x1111));
+        bytes32 bsc = bytes32(uint256(0x2222));
+        (bytes32 traitRoot, bytes32[] memory proof) = _buildTraitTree(entityId, traitHash);
+        TallGrass tg2 = _deployWith(traitRoot);
+
+        vm.prank(alice);
+        vm.expectRevert(); // Unauthorized (solady OwnableRoles)
+        tg2.artistMint(entityId, alice, traitHash, initPos, bsc, proof);
+    }
+
+    function test_artistMint_revert_already_minted() public {
+        uint256 entityId = 0;
+        bytes32 traitHash = bytes32(uint256(0xa17157));
+        bytes32 initPos = bytes32(uint256(0x1111));
+        bytes32 bsc = bytes32(uint256(0x2222));
+        (bytes32 traitRoot, bytes32[] memory proof) = _buildTraitTree(entityId, traitHash);
+        TallGrass tg2 = _deployWith(traitRoot);
+
+        vm.prank(owner);
+        tg2.artistMint(entityId, alice, traitHash, initPos, bsc, proof);
+
+        // Second artist mint of the same id should revert
+        vm.prank(owner);
+        vm.expectRevert(TallGrass.EntityAlreadyMinted.selector);
+        tg2.artistMint(entityId, bob, traitHash, initPos, bsc, proof);
+
+        // Regular mint of the same id should also revert
+        _registerOn(tg2, bob);
+        vm.deal(bob, 1 ether);
+        vm.prank(bob);
+        vm.expectRevert(TallGrass.EntityAlreadyMinted.selector);
+        tg2.mint{value: MINT_PRICE}(entityId, hex"", traitHash, initPos, bsc, proof);
+    }
+
+    function test_artistMint_revert_bad_trait_proof() public {
+        uint256 entityId = 0;
+        bytes32 traitHash = bytes32(uint256(0xa17157));
+        bytes32 initPos = bytes32(uint256(0x1111));
+        bytes32 bsc = bytes32(uint256(0x2222));
+        bytes32[] memory fakeProof = new bytes32[](1);
+        fakeProof[0] = bytes32(uint256(0xffff));
+
+        vm.prank(owner);
+        vm.expectRevert(TallGrass.InvalidTraitProof.selector);
+        tg.artistMint(entityId, alice, traitHash, initPos, bsc, fakeProof);
+    }
+
+    // -----------------------------------------------------------------------
+    // Bundled per-entity reads (tokenStates / allTokenStates)
+    // -----------------------------------------------------------------------
+
+    function test_allTokenStates_empty_before_any_mint() public view {
+        TallGrass.TokenState[] memory states = tg.allTokenStates();
+        assertEq(states.length, TOTAL_SUPPLY);
+        for (uint256 i = 0; i < states.length; i++) {
+            assertEq(states[i].owner, address(0));
+            assertEq(states[i].moveCount, 0);
+            assertEq(states[i].traitHash, bytes32(0));
+            assertEq(states[i].positionCommitment, bytes32(0));
+            assertEq(states[i].blindingSeedCommitment, bytes32(0));
+        }
+    }
+
+    function test_tokenStates_returns_only_requested_ids() public view {
+        uint256[] memory ids = new uint256[](3);
+        ids[0] = 0;
+        ids[1] = 5;
+        ids[2] = 31;
+        TallGrass.TokenState[] memory states = tg.tokenStates(ids);
+        assertEq(states.length, 3);
+    }
+
+    function test_tokenStates_reflects_artistMint() public {
+        uint256 entityId = 0;
+        bytes32 traitHash = bytes32(uint256(0xa17157));
+        bytes32 initPos = bytes32(uint256(0x1111));
+        bytes32 bsc = bytes32(uint256(0x2222));
+        (bytes32 traitRoot, bytes32[] memory proof) = _buildTraitTree(entityId, traitHash);
+        TallGrass tg2 = _deployWith(traitRoot);
+
+        vm.prank(owner);
+        tg2.artistMint(entityId, alice, traitHash, initPos, bsc, proof);
+
+        TallGrass.TokenState[] memory states = tg2.allTokenStates();
+        assertEq(states[entityId].owner, alice);
+        assertEq(states[entityId].traitHash, traitHash);
+        assertEq(states[entityId].positionCommitment, initPos);
+        assertEq(states[entityId].blindingSeedCommitment, bsc);
+        assertEq(states[entityId].moveCount, 0);
+
+        // Other ids untouched
+        assertEq(states[1].owner, address(0));
+        assertEq(states[1].traitHash, bytes32(0));
+    }
+
+    // -----------------------------------------------------------------------
     // Withdrawal (oracle)
     // -----------------------------------------------------------------------
 
