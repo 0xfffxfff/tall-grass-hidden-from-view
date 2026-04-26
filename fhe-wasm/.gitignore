@@ -1,7 +1,5 @@
 build-wasm/
 build-native/
-dist/
-!dist/package.json
 tfhe/
 test/data/
 node_modules/

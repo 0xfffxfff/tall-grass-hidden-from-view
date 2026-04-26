@@ -1,8 +1,11 @@
 .claude
 settings.local.json
 .DS_Store
-target/
 node_modules/
+
+# Foundry artifacts (anywhere except the compiled Noir circuit outputs in circuits/target/)
+contracts/out/
+contracts/cache/
 app/data/
 app/dist/
 app/persist/
