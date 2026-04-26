@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAccount, usePublicClient } from "wagmi";
 import { type Hex } from "viem";
-import { hardhat } from "wagmi/chains";
+import { APP_CHAIN } from "@/chain";
 import {
   tallGrassAbi,
   tallGrassAddress,
@@ -15,7 +15,7 @@ interface Props {
   onSelectEntity: (id: number) => void;
 }
 
-const TG_ADDR = tallGrassAddress[hardhat.id] as Hex;
+const TG_ADDR = tallGrassAddress[APP_CHAIN.id as keyof typeof tallGrassAddress] as Hex;
 
 type Mode = "all" | "mine";
 

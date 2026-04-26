@@ -4,7 +4,7 @@ import {
   useDisconnect,
   useSwitchChain,
 } from "wagmi";
-import { hardhat } from "wagmi/chains";
+import { APP_CHAIN } from "@/chain";
 import { Connect } from "./Connect";
 
 function shortAddr(a: string): string {
@@ -17,7 +17,7 @@ export function TitleBar() {
   const { disconnect } = useDisconnect();
   const { switchChain } = useSwitchChain();
 
-  const wrongChain = isConnected && chainId !== hardhat.id;
+  const wrongChain = isConnected && chainId !== APP_CHAIN.id;
 
   if (!isConnected) {
     return (
@@ -34,9 +34,9 @@ export function TitleBar() {
         <span className="sep">&middot;</span>
         <button
           className="aff live"
-          onClick={() => switchChain({ chainId: hardhat.id })}
+          onClick={() => switchChain({ chainId: APP_CHAIN.id })}
         >
-          switch to localhost
+          switch to {APP_CHAIN.name.toLowerCase()}
         </button>
         <span className="sep">&middot;</span>
         <button className="aff live" onClick={() => disconnect()}>

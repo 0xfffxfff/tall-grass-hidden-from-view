@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAccount, useChainId } from "wagmi";
-import { hardhat } from "wagmi/chains";
+import { APP_CHAIN } from "@/chain";
 import { useParticipant } from "@/hooks/useParticipant";
 import { useReveals } from "@/hooks/useReveals";
 import { projectReveals } from "@/components/monolith/monolithLib";
@@ -34,7 +34,7 @@ export function App() {
 
   const state: AppState = !isConnected
     ? "disconnected"
-    : chainId !== hardhat.id
+    : chainId !== APP_CHAIN.id
       ? "wrong-chain"
       : participant.registered
         ? "registered"

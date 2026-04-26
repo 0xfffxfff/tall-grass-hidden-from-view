@@ -1,12 +1,12 @@
 import { createConfig, http } from "wagmi";
-import { hardhat } from "wagmi/chains";
 import { injected } from "wagmi/connectors";
+import { APP_CHAIN } from "./chain";
 
 export const config = createConfig({
-  chains: [hardhat],
+  chains: [APP_CHAIN],
   connectors: [injected()],
   transports: {
-    [hardhat.id]: http("http://localhost:8545"),
+    [APP_CHAIN.id]: http(import.meta.env.VITE_RPC_URL),
   },
 });
 
