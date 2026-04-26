@@ -23,6 +23,7 @@ contract TallGrass is ERC721, OwnableRoles {
     error InvalidProof();
     error InvalidTraitProof();
     error IncorrectPayment();
+    error SupplyExhausted();
     error InsufficientDeposit();
     error WithdrawFailed();
     error ReimbursementFailed();
@@ -362,7 +363,9 @@ contract TallGrass is ERC721, OwnableRoles {
         bytes32 blindingSeedCommitment,
         bytes32[] calldata traitMerkleProof
     ) external payable {
+        if (!isParticipant[msg.sender]) revert NotRegistered();
         if (entityMinted[entityId]) revert EntityAlreadyMinted();
+        if (totalMinted >= totalSupply) revert SupplyExhausted();
         if (msg.value != mintPrice) revert IncorrectPayment();
 
         // Verify encounter proof
@@ -398,8 +401,8 @@ contract TallGrass is ERC721, OwnableRoles {
     // Withdrawal
     // -----------------------------------------------------------------------
 
-    /// @notice Withdraw accumulated ETH (mint fees). Oracle-only.
-    function withdraw() external onlyRoles(Roles.ORACLE) {
+    /// @notice Withdraw accumulated ETH (mint fees). Owner-only.
+    function withdraw() external onlyOwner {
         uint256 withdrawable = address(this).balance - totalDeposits;
         (bool ok,) = msg.sender.call{value: withdrawable}("");
         if (!ok) revert WithdrawFailed();

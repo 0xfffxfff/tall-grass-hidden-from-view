@@ -92,6 +92,14 @@ contract TallGrassTest is Test {
         tg.register(commitment, sig);
     }
 
+    function _registerOn(TallGrass instance, address who) internal {
+        bytes32 commitment = keccak256(abi.encodePacked(who, "test-register"));
+        bytes32 digest = keccak256(abi.encodePacked(who, commitment));
+        bytes memory sig = _oracleSign(digest);
+        vm.prank(who);
+        instance.register(commitment, sig);
+    }
+
     function _registerAndDeposit(address who, bytes32 commitment, uint256 depositAmount) internal {
         bytes32 regDigest = keccak256(abi.encodePacked(who, commitment));
         bytes memory regSig = _oracleSign(regDigest);
@@ -369,6 +377,7 @@ contract TallGrassTest is Test {
 
         // Redeploy with correct trait root
         TallGrass tg2 = _deployWith(traitRoot);
+        _registerOn(tg2, alice);
 
         vm.prank(alice);
         vm.deal(alice, 1 ether);
@@ -393,6 +402,8 @@ contract TallGrassTest is Test {
         bytes32 bsc = bytes32(uint256(0x2222));
         (bytes32 traitRoot, bytes32[] memory proof) = _buildTraitTree(entityId, traitHash);
         TallGrass tg2 = _deployWith(traitRoot);
+        _registerOn(tg2, alice);
+        _registerOn(tg2, bob);
 
         vm.deal(alice, 2 ether);
         vm.prank(alice);
@@ -412,6 +423,7 @@ contract TallGrassTest is Test {
         bytes32 bsc = bytes32(uint256(0x2222));
         (bytes32 traitRoot, bytes32[] memory proof) = _buildTraitTree(entityId, traitHash);
         TallGrass tg2 = _deployWith(traitRoot);
+        _registerOn(tg2, alice);
 
         vm.deal(alice, 1 ether);
         vm.prank(alice);
@@ -429,6 +441,7 @@ contract TallGrassTest is Test {
         bytes32[] memory fakeProof = new bytes32[](1);
         fakeProof[0] = bytes32(uint256(0xffff));
 
+        _registerOn(tg, alice);
         vm.deal(alice, 1 ether);
         vm.prank(alice);
         vm.expectRevert(TallGrass.InvalidTraitProof.selector);
@@ -442,6 +455,7 @@ contract TallGrassTest is Test {
         bytes32 bsc = bytes32(uint256(0x2222));
         (bytes32 traitRoot, bytes32[] memory proof) = _buildTraitTree(entityId, traitHash);
         TallGrass tg2 = _deployWith(traitRoot);
+        _registerOn(tg2, alice);
 
         // Set encounter verifier to reject
         mockEncounterVerifier.setVerify(false);
@@ -460,16 +474,16 @@ contract TallGrassTest is Test {
         // Give the contract some ETH
         vm.deal(address(tg), 1 ether);
 
-        uint256 balBefore = oracleAddr.balance;
+        uint256 balBefore = owner.balance;
 
-        vm.prank(oracleAddr);
+        vm.prank(owner);
         tg.withdraw();
 
-        assertEq(oracleAddr.balance, balBefore + 1 ether);
+        assertEq(owner.balance, balBefore + 1 ether);
         assertEq(address(tg).balance, 0);
     }
 
-    function test_withdraw_revert_not_oracle() public {
+    function test_withdraw_revert_not_owner() public {
         vm.deal(address(tg), 1 ether);
 
         vm.prank(alice);
@@ -484,13 +498,13 @@ contract TallGrassTest is Test {
         // Add mint revenue
         vm.deal(address(tg), address(tg).balance + 1 ether);
 
-        uint256 oracleBalBefore = oracleAddr.balance;
+        uint256 ownerBalBefore = owner.balance;
 
-        vm.prank(oracleAddr);
+        vm.prank(owner);
         tg.withdraw();
 
         // Should withdraw only the non-deposit balance (1 ether revenue)
-        assertEq(oracleAddr.balance, oracleBalBefore + 1 ether);
+        assertEq(owner.balance, ownerBalBefore + 1 ether);
         // Deposit still in contract
         assertEq(address(tg).balance, 0.5 ether);
     }
@@ -661,6 +675,7 @@ contract TallGrassTest is Test {
         (bytes32 traitRoot, bytes32[] memory proof) = _buildTraitTree(entityId, traitHash);
 
         TallGrass newTg = _deployWith(traitRoot);
+        _registerOn(newTg, to);
 
         vm.deal(to, 1 ether);
         vm.prank(to);
