@@ -5,7 +5,14 @@ export function Identity() {
         <div className="group">
           <span>
             <span className="k">source</span>
-            <span className="v">github.com/0xfff/tall-grass</span>
+            <a
+              className="v act"
+              href="https://github.com/0xfffxfff/tall-grass-hidden-from-view"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              github.com/0xfffxfff/tall-grass-hidden-from-view
+            </a>
           </span>
           <span>
             <span className="k">license</span>
@@ -13,7 +20,14 @@ export function Identity() {
           </span>
           <span>
             <span className="k">also published</span>
-            <span className="v">fhe-wasm (TFHE&nbsp;&rarr;&nbsp;WASM, Apache&nbsp;2.0)</span>
+            <a
+              className="v act"
+              href="https://github.com/0xfffxfff/tall-grass-hidden-from-view/tree/main/fhe-wasm"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              fhe-wasm (TFHE&nbsp;&rarr;&nbsp;WASM, Apache&nbsp;2.0)
+            </a>
           </span>
         </div>
         <div className="group">
