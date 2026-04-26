@@ -17,6 +17,7 @@ const envSchema = z.object({
       "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
     ),
   RPC_URL: z.string().default("http://127.0.0.1:8545"),
+  NETWORK: z.string().default("localhost"),
   GRID_WIDTH: z.coerce.number().int().positive().default(32),
   GRID_HEIGHT: z.coerce.number().int().positive().default(32),
   ENTITY_COUNT: z.coerce.number().int().positive().default(32),
@@ -44,7 +45,7 @@ export const config = {
   ),
   COMPARISON_PROOFS_DIR: resolve(join(env.DATA_DIR, "comparison-proofs")),
   DEPLOYMENT_DIR: resolve(
-    join(__dirname, "..", "contracts", "deployments", "localhost"),
+    join(__dirname, "..", "contracts", "deployments", env.NETWORK),
   ),
   CIRCUITS_TARGET_DIR: resolve(
     join(__dirname, "..", "circuits", "target"),
