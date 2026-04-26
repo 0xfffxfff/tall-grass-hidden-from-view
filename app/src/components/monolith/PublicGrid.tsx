@@ -1,20 +1,16 @@
 import { useState } from "react";
-import { useAccount } from "wagmi";
 import { Heatmap } from "./Heatmap";
 import { Stream } from "./Stream";
-import { Drilldown } from "./Drilldown";
 import { TraitTabs } from "./TraitTabs";
 import {
-  pairKey,
   recordToReveal,
   type LitByTrait,
   type Reveal,
   type RevealsByPair,
 } from "./monolithLib";
-import { useFhe } from "@/hooks/useFhe";
-import { api, type RevealRecord } from "@/api";
+import { useEntityCompare } from "@/hooks/useEntityCompare";
+import { type RevealRecord } from "@/api";
 import { WorkStrip } from "./WorkStrip";
-import { workBus } from "@/lib/workBus";
 
 interface Props {
   entityCount: number;
@@ -26,6 +22,7 @@ interface Props {
   prepend: (rec: RevealRecord) => void;
   drillId: number | null;
   onDrillIdChange: (id: number) => void;
+  onEntitySelect?: (id: number) => void;
 }
 
 export function PublicGrid({
@@ -38,65 +35,23 @@ export function PublicGrid({
   prepend,
   drillId,
   onDrillIdChange,
+  onEntitySelect,
 }: Props) {
-  const { address } = useAccount();
-  const fhe = useFhe();
-
   const [trait, setTrait] = useState(0);
-  const [busyKeys, setBusyKeys] = useState<Set<string>>(new Set());
-  const [flashKey, setFlashKey] = useState<string | null>(null);
-  const [error, setError] = useState("");
+  const { busyKeys, flashKey, error, fhe, runCompareOnPair } = useEntityCompare({
+    prepend,
+    litByTrait,
+  });
 
   const litCount = litByTrait[trait]?.size ?? 0;
   const totalPairs = (entityCount * (entityCount - 1)) / 2;
   const streamRows: Reveal[] = flatReveals.slice(0, 12).map(recordToReveal);
 
-  async function runCompareOnPair(a: number, b: number, t: number) {
-    const key = pairKey(a, b);
-    if (busyKeys.has(key)) return;
-    if (litByTrait[t]?.has(key)) return;
-    setError("");
-    setBusyKeys((prev) => new Set(prev).add(key));
-    const decryptId = `oracle-decrypt-${key}-${t}`;
-    try {
-      if (t !== trait) setTrait(t);
-      // Lazy-load wasm + cloud key on first compare; subsequent calls are fast.
-      await fhe.ensureReady();
-      const { gtHex, eqHex } = await fhe.compare(a, b, t);
-      workBus.start({
-        id: decryptId,
-        scope: "public",
-        label: "oracle decrypting result",
-      });
-      const res = await api.compare(gtHex, eqHex, {
-        entityA: a,
-        entityB: b,
-        traitIndex: t,
-        revealer: address ?? undefined,
-      });
-      workBus.end(decryptId);
-      const rec: RevealRecord = {
-        a,
-        b,
-        trait: t,
-        op: res.result,
-        revealedAt: Date.now(),
-        revealer: address?.toLowerCase() ?? "anon",
-      };
-      prepend(rec);
-      setFlashKey(key);
-      setTimeout(() => setFlashKey((k) => (k === key ? null : k)), 900);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "compare failed");
-      workBus.end(decryptId);
-    } finally {
-      setBusyKeys((prev) => {
-        const next = new Set(prev);
-        next.delete(key);
-        return next;
-      });
-    }
-  }
+  // The Stream and Drilldown row labels both navigate to the inline
+  // drilldown by default, but if a modal opener was provided we route
+  // entity-id clicks to the modal instead. Heatmap cells stay as
+  // pair-comparisons regardless.
+  const handleEntityNav = onEntitySelect ?? onDrillIdChange;
 
   return (
     <main className="public">
@@ -164,19 +119,8 @@ export function PublicGrid({
       <Stream
         rows={streamRows}
         enteringIds={new Set()}
-        onEntityClick={onDrillIdChange}
+        onEntityClick={handleEntityNav}
       />
-
-      {drillId !== null && (
-        <Drilldown
-          entityId={drillId}
-          entityCount={entityCount}
-          traitCount={traitCount}
-          reveals={revealsByPair}
-          onSelectEntity={onDrillIdChange}
-          onCellClick={runCompareOnPair}
-        />
-      )}
     </main>
   );
 }

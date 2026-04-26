@@ -55,6 +55,14 @@ export function pairKey(a: number, b: number): string {
   return `${lo}_${hi}`;
 }
 
+// Per-(pair, trait) key for busy/flash state. The matrix in EntityModal
+// shows all 7 traits per pair simultaneously, so a pair-only key would
+// glow the entire column when one cell is clicked. Including the trait
+// disambiguates which specific cell is in flight.
+export function pairTraitKey(a: number, b: number, t: number): string {
+  return `${pairKey(a, b)}_${t}`;
+}
+
 export function pad2(n: number): string {
   return n < 10 ? "0" + n : "" + n;
 }

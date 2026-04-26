@@ -1180,14 +1180,49 @@ body.report-mode .titlebar { display: none; }
 }
 .entity-modal .pane-image .hero {
   flex: 1;
-  background: #000 center/cover no-repeat;
+  background: #000;
   aspect-ratio: 9 / 16;
   position: relative;
+  overflow: hidden;
+}
+/* Layered render: static JPG behind, /full iframe on top. The iframe
+   paints over the JPG once it boots — if it fails or is sandboxed off
+   the network, the JPG stays as the fallback. */
+.entity-modal .pane-image .hero-still,
+.entity-modal .pane-image .hero-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.entity-modal .pane-image .hero-still {
+  object-fit: cover;
+  z-index: 0;
+}
+.entity-modal .pane-image .hero-frame {
+  border: 0;
+  background: transparent;
+  z-index: 1;
+}
+/* Diagonal-stripe veil for unrevealed entities (mirrors .tile-veil
+   from the registry tiles). No image, no WebGL. */
+.entity-modal .pane-image .hero-veil {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background:
+    repeating-linear-gradient(
+      45deg,
+      #0e0e0e 0 6px,
+      #060606 6px 12px
+    );
 }
 .entity-modal .pane-image .hero::after {
   content: "";
   position: absolute; inset: 0;
   pointer-events: none;
+  z-index: 2;
   background:
     linear-gradient(to bottom, rgba(0,0,0,0.40) 0%, rgba(0,0,0,0) 90px),
     linear-gradient(to top,    rgba(0,0,0,0.58) 0%, rgba(0,0,0,0.30) 22%, rgba(0,0,0,0) 38%),
@@ -1238,6 +1273,8 @@ body.report-mode .titlebar { display: none; }
   text-transform: uppercase;
   letter-spacing: 0.06em;
   line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .entity-modal .pane-data .close:hover { color: var(--fg); }
 

@@ -19,6 +19,7 @@ import { EntityRegistry } from "@/components/monolith/EntityRegistry";
 import { EncountersInline } from "@/components/monolith/EncountersInline";
 import { Exhibition } from "@/components/monolith/Exhibition";
 import { Identity } from "@/components/monolith/Identity";
+import { EntityModal } from "@/components/monolith/EntityModal";
 
 type AppState = "disconnected" | "wrong-chain" | "unregistered" | "registered";
 
@@ -31,6 +32,7 @@ export function App() {
     [],
   );
   const [drillId, setDrillId] = useState<number | null>(null);
+  const [modalEntityId, setModalEntityId] = useState<number | null>(null);
 
   const state: AppState = !isConnected
     ? "disconnected"
@@ -113,7 +115,7 @@ export function App() {
 
         <EntityRegistry
           entityCount={reveals.entityCount}
-          onSelectEntity={setDrillId}
+          onSelectEntity={setModalEntityId}
         />
 
         <PublicGrid
@@ -126,6 +128,7 @@ export function App() {
           prepend={reveals.prepend}
           drillId={drillId}
           onDrillIdChange={setDrillId}
+          onEntitySelect={setModalEntityId}
         />
 
         <EncountersInline
@@ -143,6 +146,16 @@ export function App() {
 
         <Identity />
       </div>
+
+      <EntityModal
+        entityId={modalEntityId}
+        entityCount={reveals.entityCount}
+        traitCount={reveals.traitCount}
+        reveals={projection.revealsByPair}
+        flatReveals={reveals.reveals}
+        prepend={reveals.prepend}
+        onClose={() => setModalEntityId(null)}
+      />
     </>
   );
 }

@@ -3,6 +3,7 @@ import {
   fmtId,
   fmtTime,
   pairKey,
+  pairTraitKey,
   type LitByTrait,
   type RevealsByPair,
 } from "./monolithLib";
@@ -43,9 +44,10 @@ export function Heatmap({
         continue;
       }
       const key = pairKey(i, j);
+      const busyKey = pairTraitKey(i, j, trait);
       const isLit = litTrait.has(key);
-      const isBusy = busyKeys.has(key);
-      const isFlash = flashKey === key;
+      const isBusy = busyKeys.has(busyKey);
+      const isFlash = flashKey === busyKey;
       const cls =
         "hm-cell" +
         (isLit ? " lit" : "") +
