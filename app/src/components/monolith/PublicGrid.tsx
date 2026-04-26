@@ -126,6 +126,14 @@ export function PublicGrid({
       </div>
 
       <WorkStrip scope="public" className="public-work" />
+      {fhe.awaitingConsent && (
+        <div className="public-consent" role="group" aria-label="cloud key download confirmation">
+          <span className="pip" />
+          <span className="label">first use downloads a ~78 MB homomorphic-encryption key to your browser</span>
+          <button type="button" className="consent-action" onClick={fhe.grantConsent}>continue</button>
+          <button type="button" className="consent-action ghost" onClick={fhe.cancelConsent}>cancel</button>
+        </div>
+      )}
       {fhe.status === "error" && fhe.message && (
         <div className="public-error">{fhe.message}</div>
       )}
