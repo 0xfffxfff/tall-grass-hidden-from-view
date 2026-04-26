@@ -124,7 +124,7 @@ npx tsx src/merkle.ts ./output
 Output:
 - `output/merkle.json` — Root hash + per-entity `{ id, ciphertextHash, proof }`.
 - The `root` goes to the contract constructor as `_entityTraitMerkleRoot`.
-- Each entity's `ciphertextHash` is the `_entityTraitCID` passed to `mint()`.
+- Each entity's `ciphertextHash` is the `_entityTraitHash` passed to `mint()`.
 
 The tree uses `StandardMerkleTree.of(values, ["uint256", "bytes32"])` — sorted-pair double-hash, compatible with solady's `MerkleProofLib`.
 

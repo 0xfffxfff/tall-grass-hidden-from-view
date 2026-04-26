@@ -4,7 +4,7 @@
 // and builds a StandardMerkleTree compatible with solady's MerkleProofLib.
 //
 // The contract verifies:
-//   bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(entityId, _entityTraitCID))));
+//   bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(entityId, _entityTraitHash))));
 //   MerkleProofLib.verifyCalldata(proof, root, leaf)
 //
 // StandardMerkleTree.of() produces this exact double-hash structure.

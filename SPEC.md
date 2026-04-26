@@ -243,7 +243,7 @@ An encounter occurs when a participant's position matches an entity's position A
 3. Oracle generates a ZK encounter proof. The proof attests that the participant's committed position matches an entity position derived from the landscape seed.
    - **Private inputs:** `seed`, `participant_x`, `participant_y`, `participant_salt`
    - **Public inputs:** `seedCommitment`, `entityId`, `positionCommitment` (participant's current on-chain commitment), `gridWidth`, `gridHeight`, `initialPositionCommitment` (entity's starting position commitment for mint), `blindingSeedCommitment` (entity's blinding seed commitment for mint)
-4. Oracle returns the encounter proof along with: entity index, entity ciphertext + Merkle proof against `entityTraitMerkleRoot` (see §4.4), `initialPositionCommitment`, `blindingSeedCommitment`, `entityTraitCID`, and `traitMerkleProof`.
+4. Oracle returns the encounter proof along with: entity index, entity ciphertext + Merkle proof against `entityTraitMerkleRoot` (see §4.4), `initialPositionCommitment`, `blindingSeedCommitment`, `entityTraitHash`, and `traitMerkleProof`.
 5. Participant sees the entity's encrypted form (visual generated from ciphertext). The Merkle proof lets the participant verify the ciphertext is genuine.
 6. If the participant owns other entities, they can compare the encountered entity against their own via FHE (§4.5). Their first mint is always blind.
 7. Participant decides to mint (for unminted entities) or simply observes (for minted entities).
@@ -283,7 +283,7 @@ All entity traits are pre-encrypted before deployment using TFHE.
 **Ciphertext lifecycle:**
 - **At deployment:** `entityTraitMerkleRoot` is stored on-chain. Ciphertexts are held by the oracle. No entity visuals are publicly derivable.
 - **At encounter:** The oracle serves the entity's ciphertext + Merkle proof against `entityTraitMerkleRoot`. The participant verifies the proof, confirming the ciphertext is genuine for that entity index. The visual is generated client-side from the ciphertext.
-- **At mint:** The `entityTraitCID` is stored on-chain (verified against `entityTraitMerkleRoot` via Merkle proof in the `mint()` function). The ciphertext becomes permanently, publicly retrievable. The entity's visual is now derivable by anyone.
+- **At mint:** The `entityTraitHash` is stored on-chain (verified against `entityTraitMerkleRoot` via Merkle proof in the `mint()` function). The ciphertext becomes permanently, publicly retrievable. The entity's visual is now derivable by anyone.
 - **Post-mint encounters:** When someone encounters a minted entity, the ciphertext is already public on the token — no oracle needed to serve it.
 
 **Ciphertext size:** Each 8-bit TFHE ciphertext is 8 LweSamples at 2,016 bytes each = ~15.8 KB per trait. For 7 traits per entity: ~110 KB per entity. For 32 entities: ~3.5 MB total. Stored on IPFS with on-chain content hashes (Merkle root). On-chain storage of the full ciphertexts is infeasible — IPFS is the only practical option.
@@ -341,7 +341,7 @@ Each entity has a visual identity derived from its encrypted ciphertext data.
 ### 4.7 Token Standard
 
 - **Standard:** ERC-721 (solady implementation).
-- **On-chain data:** Token ID, owner, minting move counter, encrypted trait CID (content hash pointing to ciphertext on IPFS).
+- **On-chain data:** Token ID, owner, minting move counter, encrypted trait hash (keccak256 of the ciphertext).
 - **Metadata:** Delegated to a separate `TallGrassMetadata` contract (address stored as `metadataContract`, set by owner). The metadata contract:
   - Stores entity ciphertexts on-chain via SSTORE2 (chunked for large data). The `ciphertextHash` is exposed for verification.
   - Provides per-token and shared descriptions (SSTORE2-backed).
@@ -487,7 +487,7 @@ uint256 public totalDeposits;                            // Sum of all deposits,
 
 // Entity state
 mapping(uint256 => bool) public entityMinted;            // Whether entity has been minted
-mapping(uint256 => bytes32) public entityTraitCID;       // IPFS CID of encrypted traits — set at mint time (empty before mint)
+mapping(uint256 => bytes32) public entityTraitHash;       // keccak256 of encrypted traits ciphertext — set at mint time (empty before mint)
 mapping(uint256 => bytes32) public entityPositionCommitments;   // Current position commitment per entity
 mapping(uint256 => bytes32) public entityBlindingSeedCommitments; // hash_1(blinding_seed) — set at mint
 mapping(uint256 => uint256) public entityMoveCount;      // Per-entity move counter (for salt/blinding derivation)
@@ -538,15 +538,15 @@ relayMove(participant, proof, newPositionCommitment)
   → Reimburses oracle from participant's deposit (gas used + GAS_OVERHEAD of 50K).
   → If deposit exhausted after reimbursement: emits DepositDepleted.
 
-mint(entityId, encounterProof, entityTraitCID, initialPositionCommitment, blindingSeedCommitment, traitMerkleProof)
+mint(entityId, encounterProof, entityTraitHash, initialPositionCommitment, blindingSeedCommitment, traitMerkleProof)
   → Payable. Participant mints an encountered entity. 6 parameters. Requires:
     - ZK encounter proof verifies against 7 public inputs:
       [seedCommitment, entityId, positionCommitments[msg.sender], gridWidth, gridHeight,
        initialPositionCommitment, blindingSeedCommitment]
     - Entity is not already minted
-    - traitMerkleProof verifies entityTraitCID against entityTraitMerkleRoot for this entityId
+    - traitMerkleProof verifies entityTraitHash against entityTraitMerkleRoot for this entityId
     - msg.value >= mintPrice
-  → Stores entityTraitCID, entityPositionCommitments[entityId] = initialPositionCommitment,
+  → Stores entityTraitHash, entityPositionCommitments[entityId] = initialPositionCommitment,
     entityBlindingSeedCommitments[entityId] = blindingSeedCommitment.
   → Sets entityMoveCount[entityId] = 0. Marks entity as minted. Transfers ERC-721 to participant.
 
@@ -574,7 +574,7 @@ withdraw()
 event Registered(address indexed participant, bytes32 positionCommitment);
 event Moved(address indexed participant, bytes32 newCommitment, uint256 moveCounter);
 event EntityMoved(uint256 indexed entityId, bytes32 directionCommitment, uint256 moveCounter);
-event Minted(address indexed participant, uint256 indexed entityId, uint256 moveCounter, bytes32 entityTraitCID);
+event Minted(address indexed participant, uint256 indexed entityId, uint256 moveCounter, bytes32 entityTraitHash);
 event Deposited(address indexed participant, uint256 amount, uint256 totalBalance);
 event DepositWithdrawn(address indexed participant, uint256 amount);
 event DepositDepleted(address indexed participant);

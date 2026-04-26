@@ -190,7 +190,7 @@ function EncounterRow({
       args: [
         BigInt(encounter.entityId),
         encounter.encounterProof as Hex,
-        encounter.entityTraitCID as Hex,
+        encounter.entityTraitHash as Hex,
         encounter.initialPositionCommitment as Hex,
         encounter.blindingSeedCommitment as Hex,
         encounter.traitMerkleProof as Hex[],

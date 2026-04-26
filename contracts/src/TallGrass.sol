@@ -34,7 +34,7 @@ contract TallGrass is ERC721, OwnableRoles {
     event Registered(address indexed participant, bytes32 positionCommitment);
     event Moved(address indexed participant, bytes32 newCommitment, uint256 moveCounter);
     event EntityMoved(uint256 indexed entityId, bytes32 directionCommitment, uint256 moveCounter);
-    event Minted(address indexed participant, uint256 indexed entityId, uint256 moveCounter, bytes32 entityTraitCID);
+    event Minted(address indexed participant, uint256 indexed entityId, uint256 moveCounter, bytes32 entityTraitHash);
     event Deposited(address indexed participant, uint256 amount, uint256 totalBalance);
     event DepositWithdrawn(address indexed participant, uint256 amount);
     event DepositDepleted(address indexed participant);
@@ -89,7 +89,7 @@ contract TallGrass is ERC721, OwnableRoles {
 
     // Entity state
     mapping(uint256 => bool) public entityMinted;
-    mapping(uint256 => bytes32) public entityTraitCID;
+    mapping(uint256 => bytes32) public entityTraitHash;
     mapping(uint256 => bytes32) public entityPositionCommitments;
     mapping(uint256 => bytes32) public entityBlindingSeedCommitments;
     mapping(uint256 => uint256) public entityMoveCount;
@@ -349,14 +349,14 @@ contract TallGrass is ERC721, OwnableRoles {
     /// @notice Mint an encountered entity using a ZK encounter proof.
     /// @param entityId The entity to mint.
     /// @param encounterProof ZK proof of co-location with entity.
-    /// @param _entityTraitCID IPFS CID of encrypted traits.
+    /// @param _entityTraitHash keccak256 hash of the entity's encrypted traits ciphertext.
     /// @param initialPositionCommitment Poseidon(x, y, salt) for entity's starting position.
     /// @param blindingSeedCommitment hash_1(blinding_seed) for direction blinding.
-    /// @param traitMerkleProof Merkle proof of _entityTraitCID against entityTraitMerkleRoot.
+    /// @param traitMerkleProof Merkle proof of _entityTraitHash against entityTraitMerkleRoot.
     function mint(
         uint256 entityId,
         bytes calldata encounterProof,
-        bytes32 _entityTraitCID,
+        bytes32 _entityTraitHash,
         bytes32 initialPositionCommitment,
         bytes32 blindingSeedCommitment,
         bytes32[] calldata traitMerkleProof
@@ -375,14 +375,14 @@ contract TallGrass is ERC721, OwnableRoles {
         publicInputs[6] = blindingSeedCommitment;
         if (!encounterVerifier.verify(encounterProof, publicInputs)) revert InvalidProof();
 
-        // Verify trait CID against trait Merkle root (keccak256 tree)
-        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(entityId, _entityTraitCID))));
+        // Verify trait hash against trait Merkle root (keccak256 tree)
+        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(entityId, _entityTraitHash))));
         if (!MerkleProofLib.verifyCalldata(traitMerkleProof, entityTraitMerkleRoot, leaf)) {
             revert InvalidTraitProof();
         }
 
         entityMinted[entityId] = true;
-        entityTraitCID[entityId] = _entityTraitCID;
+        entityTraitHash[entityId] = _entityTraitHash;
         entityPositionCommitments[entityId] = initialPositionCommitment;
         entityBlindingSeedCommitments[entityId] = blindingSeedCommitment;
         entityMoveCount[entityId] = 0;
@@ -390,7 +390,7 @@ contract TallGrass is ERC721, OwnableRoles {
 
         _mint(msg.sender, entityId);
 
-        emit Minted(msg.sender, entityId, moveCounter, _entityTraitCID);
+        emit Minted(msg.sender, entityId, moveCounter, _entityTraitHash);
     }
 
     // -----------------------------------------------------------------------

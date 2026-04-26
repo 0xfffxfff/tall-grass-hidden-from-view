@@ -360,12 +360,12 @@ contract TallGrassTest is Test {
 
     function test_mint() public {
         uint256 entityId = 5;
-        bytes32 traitCID = bytes32(uint256(0xaaaa));
+        bytes32 traitHash = bytes32(uint256(0xaaaa));
         bytes32 initPosCommitment = bytes32(uint256(0x1111));
         bytes32 blindingSeedCommitment = bytes32(uint256(0x2222));
 
         // Build trait Merkle proof
-        (bytes32 traitRoot, bytes32[] memory proof) = _buildTraitTree(entityId, traitCID);
+        (bytes32 traitRoot, bytes32[] memory proof) = _buildTraitTree(entityId, traitHash);
 
         // Redeploy with correct trait root
         TallGrass tg2 = _deployWith(traitRoot);
@@ -373,13 +373,13 @@ contract TallGrassTest is Test {
         vm.prank(alice);
         vm.deal(alice, 1 ether);
         tg2.mint{value: MINT_PRICE}(
-            entityId, hex"", traitCID,
+            entityId, hex"", traitHash,
             initPosCommitment, blindingSeedCommitment, proof
         );
 
         assertTrue(tg2.entityMinted(entityId));
         assertEq(tg2.ownerOf(entityId), alice);
-        assertEq(tg2.entityTraitCID(entityId), traitCID);
+        assertEq(tg2.entityTraitHash(entityId), traitHash);
         assertEq(tg2.entityPositionCommitments(entityId), initPosCommitment);
         assertEq(tg2.entityBlindingSeedCommitments(entityId), blindingSeedCommitment);
         assertEq(tg2.entityMoveCount(entityId), 0);
@@ -388,40 +388,40 @@ contract TallGrassTest is Test {
 
     function test_mint_revert_already_minted() public {
         uint256 entityId = 5;
-        bytes32 traitCID = bytes32(uint256(0xaaaa));
+        bytes32 traitHash = bytes32(uint256(0xaaaa));
         bytes32 initPos = bytes32(uint256(0x1111));
         bytes32 bsc = bytes32(uint256(0x2222));
-        (bytes32 traitRoot, bytes32[] memory proof) = _buildTraitTree(entityId, traitCID);
+        (bytes32 traitRoot, bytes32[] memory proof) = _buildTraitTree(entityId, traitHash);
         TallGrass tg2 = _deployWith(traitRoot);
 
         vm.deal(alice, 2 ether);
         vm.prank(alice);
-        tg2.mint{value: MINT_PRICE}(entityId, hex"", traitCID, initPos, bsc, proof);
+        tg2.mint{value: MINT_PRICE}(entityId, hex"", traitHash, initPos, bsc, proof);
 
         // Second mint should fail
         vm.deal(bob, 1 ether);
         vm.prank(bob);
         vm.expectRevert(TallGrass.EntityAlreadyMinted.selector);
-        tg2.mint{value: MINT_PRICE}(entityId, hex"", traitCID, initPos, bsc, proof);
+        tg2.mint{value: MINT_PRICE}(entityId, hex"", traitHash, initPos, bsc, proof);
     }
 
     function test_mint_revert_insufficient_payment() public {
         uint256 entityId = 5;
-        bytes32 traitCID = bytes32(uint256(0xaaaa));
+        bytes32 traitHash = bytes32(uint256(0xaaaa));
         bytes32 initPos = bytes32(uint256(0x1111));
         bytes32 bsc = bytes32(uint256(0x2222));
-        (bytes32 traitRoot, bytes32[] memory proof) = _buildTraitTree(entityId, traitCID);
+        (bytes32 traitRoot, bytes32[] memory proof) = _buildTraitTree(entityId, traitHash);
         TallGrass tg2 = _deployWith(traitRoot);
 
         vm.deal(alice, 1 ether);
         vm.prank(alice);
         vm.expectRevert(TallGrass.IncorrectPayment.selector);
-        tg2.mint{value: 0.1 ether}(entityId, hex"", traitCID, initPos, bsc, proof);
+        tg2.mint{value: 0.1 ether}(entityId, hex"", traitHash, initPos, bsc, proof);
     }
 
     function test_mint_revert_bad_trait_proof() public {
         uint256 entityId = 5;
-        bytes32 traitCID = bytes32(uint256(0xaaaa));
+        bytes32 traitHash = bytes32(uint256(0xaaaa));
         bytes32 initPos = bytes32(uint256(0x1111));
         bytes32 bsc = bytes32(uint256(0x2222));
         // Use wrong trait root (the default ENTITY_TRAIT_ROOT won't match)
@@ -432,15 +432,15 @@ contract TallGrassTest is Test {
         vm.deal(alice, 1 ether);
         vm.prank(alice);
         vm.expectRevert(TallGrass.InvalidTraitProof.selector);
-        tg.mint{value: MINT_PRICE}(entityId, hex"", traitCID, initPos, bsc, fakeProof);
+        tg.mint{value: MINT_PRICE}(entityId, hex"", traitHash, initPos, bsc, fakeProof);
     }
 
     function test_mint_revert_invalid_encounter_proof() public {
         uint256 entityId = 5;
-        bytes32 traitCID = bytes32(uint256(0xaaaa));
+        bytes32 traitHash = bytes32(uint256(0xaaaa));
         bytes32 initPos = bytes32(uint256(0x1111));
         bytes32 bsc = bytes32(uint256(0x2222));
-        (bytes32 traitRoot, bytes32[] memory proof) = _buildTraitTree(entityId, traitCID);
+        (bytes32 traitRoot, bytes32[] memory proof) = _buildTraitTree(entityId, traitHash);
         TallGrass tg2 = _deployWith(traitRoot);
 
         // Set encounter verifier to reject
@@ -449,7 +449,7 @@ contract TallGrassTest is Test {
         vm.deal(alice, 1 ether);
         vm.prank(alice);
         vm.expectRevert(TallGrass.InvalidProof.selector);
-        tg2.mint{value: MINT_PRICE}(entityId, hex"", traitCID, initPos, bsc, proof);
+        tg2.mint{value: MINT_PRICE}(entityId, hex"", traitHash, initPos, bsc, proof);
     }
 
     // -----------------------------------------------------------------------
@@ -655,16 +655,16 @@ contract TallGrassTest is Test {
 
     /// @dev Mint an entity to `to` using mock encounter verifier.
     function _mintEntity(uint256 entityId, address to) internal {
-        bytes32 traitCID = bytes32(uint256(entityId + 0xaa00));
+        bytes32 traitHash = bytes32(uint256(entityId + 0xaa00));
         bytes32 initPos = bytes32(uint256(entityId + 0xcc00));
         bytes32 bsc = bytes32(uint256(entityId + 0xdd00));
-        (bytes32 traitRoot, bytes32[] memory proof) = _buildTraitTree(entityId, traitCID);
+        (bytes32 traitRoot, bytes32[] memory proof) = _buildTraitTree(entityId, traitHash);
 
         TallGrass newTg = _deployWith(traitRoot);
 
         vm.deal(to, 1 ether);
         vm.prank(to);
-        newTg.mint{value: MINT_PRICE}(entityId, hex"", traitCID, initPos, bsc, proof);
+        newTg.mint{value: MINT_PRICE}(entityId, hex"", traitHash, initPos, bsc, proof);
 
         // Swap tg to the new instance so tests use the minted state
         tg = newTg;
@@ -672,7 +672,7 @@ contract TallGrassTest is Test {
 
     /// @dev Build a minimal keccak256 Merkle tree with 32 leaves, returning the root
     ///      and proof for the given entityId.
-    function _buildTraitTree(uint256 entityId, bytes32 traitCID)
+    function _buildTraitTree(uint256 entityId, bytes32 traitHash)
         internal
         pure
         returns (bytes32 root, bytes32[] memory proof)
@@ -680,7 +680,7 @@ contract TallGrassTest is Test {
         // Build 32 leaves using OZ's double-hash pattern
         bytes32[] memory leaves = new bytes32[](TOTAL_SUPPLY);
         for (uint256 i = 0; i < TOTAL_SUPPLY; i++) {
-            bytes32 cid = i == entityId ? traitCID : bytes32(uint256(i + 0xbb00));
+            bytes32 cid = i == entityId ? traitHash : bytes32(uint256(i + 0xbb00));
             leaves[i] = keccak256(bytes.concat(keccak256(abi.encode(i, cid))));
         }
 

@@ -373,7 +373,7 @@ async function main() {
   const encounter = encounterResult.encounters[0];
   info(`Encounter valid for entity ${encounter.entityId}`);
   info(`Encounter proof: ${encounter.encounterProof.slice(0, 18)}...`);
-  info(`Trait CID: ${encounter.entityTraitCID.slice(0, 18)}...`);
+  info(`Trait hash: ${encounter.entityTraitHash.slice(0, 18)}...`);
   info(`Merkle proof: ${encounter.traitMerkleProof.length} nodes`);
 
   // 8. Mint
@@ -384,7 +384,7 @@ async function main() {
   castSend(
     CONTRACT,
     "mint(uint256,bytes,bytes32,bytes32,bytes32,bytes32[])",
-    `${encounter.entityId} ${encounter.encounterProof} ${encounter.entityTraitCID} ${encounter.initialPositionCommitment} ${encounter.blindingSeedCommitment} "${proofArray}"`,
+    `${encounter.entityId} ${encounter.encounterProof} ${encounter.entityTraitHash} ${encounter.initialPositionCommitment} ${encounter.blindingSeedCommitment} "${proofArray}"`,
     "--value 0.2ether"
   );
 
@@ -393,12 +393,12 @@ async function main() {
   const owner = cast(`call ${CONTRACT} "ownerOf(uint256)(address)" ${encounter.entityId}`);
   const minted = cast(`call ${CONTRACT} "entityMinted(uint256)(bool)" ${encounter.entityId}`);
   const totalMinted = cast(`call ${CONTRACT} "totalMinted()(uint256)" `);
-  const traitCID = cast(`call ${CONTRACT} "entityTraitCID(uint256)(bytes32)" ${encounter.entityId}`);
+  const traitHash = cast(`call ${CONTRACT} "entityTraitHash(uint256)(bytes32)" ${encounter.entityId}`);
 
   info(`Entity ${encounter.entityId} owner: ${owner}`);
   info(`Entity minted: ${minted}`);
   info(`Total minted: ${totalMinted}`);
-  info(`Trait CID: ${traitCID.slice(0, 18)}...`);
+  info(`Trait hash: ${traitHash.slice(0, 18)}...`);
 
   const ownerMatch = owner.toLowerCase() === ACCOUNT.toLowerCase();
   if (!ownerMatch) {

@@ -36,7 +36,7 @@ export interface RelayResult {
 export interface EncounterData {
   entityId: number;
   encounterProof: string;
-  entityTraitCID: string;
+  entityTraitHash: string;
   traitMerkleProof: string[];
   initialPositionCommitment: string;
   blindingSeedCommitment: string;

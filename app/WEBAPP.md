@@ -53,14 +53,14 @@ The interface should feel like an instrument panel for navigating something invi
 ### R5. Encounters
 - During auto-walk: client checks for encounters after each step, attestations accumulate
 - During manual walk: participant can check encounter after each move
-- Valid encounter: attestation with deadline, entity ID, trait CID, Merkle proof, oracle signature
+- Valid encounter: attestation with deadline, entity ID, trait hash, Merkle proof, oracle signature
 - List of pending (active) attestations shown — countdown to expiry
 - No position information revealed for encounters
 
 ### R6. Minting
 - Collect an encountered entity as NFT for mint price (0.2 ETH)
 - Requires valid, non-expired attestation
-- On-chain: Merkle proof of trait CID, oracle signature verification
+- On-chain: Merkle proof of trait hash, oracle signature verification
 - Post-mint: entity is owned, stops autonomous movement, traits become accessible for comparison
 
 ### R7. FHE Trait Comparison

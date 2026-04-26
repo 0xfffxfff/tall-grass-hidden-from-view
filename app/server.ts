@@ -296,7 +296,7 @@ async function generateEncounterProof(
   entityId: number,
 ): Promise<{
   encounterProof: string;
-  entityTraitCID: string;
+  entityTraitHash: string;
   traitMerkleProof: string[];
   initialPositionCommitment: string;
   blindingSeedCommitment: string;
@@ -337,18 +337,18 @@ async function generateEncounterProof(
   const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
   console.log(`  Encounter proof generated in ${elapsed}s`);
 
-  let entityTraitCID = ZeroHash;
+  let entityTraitHash = ZeroHash;
   let traitMerkleProof: string[] = [];
   const md = svc.merkleData;
   if (md && md.entities[entityId]) {
     const entity = md.entities[entityId];
-    entityTraitCID = entity.ciphertextHash;
+    entityTraitHash = entity.ciphertextHash;
     traitMerkleProof = entity.proof;
   }
 
   return {
     encounterProof: "0x" + bytesToHex(proofResult.proof),
-    entityTraitCID,
+    entityTraitHash,
     traitMerkleProof,
     initialPositionCommitment: toBytes32(initialPositionCommitment),
     blindingSeedCommitment: toBytes32(blindingSeedCommitment),
