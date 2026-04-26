@@ -130,11 +130,21 @@ The tree uses `StandardMerkleTree.of(values, ["uint256", "bytes32"])` — sorted
 
 ### 3. Start oracle
 
+The production oracle is integrated into the web app (`app/server.ts`, Hono).
+From the repo root, with the batch output already in `app/data/`:
+
 ```bash
-SECRET_KEY=./output/secret.key node oracle/server.mjs
+make start-server
 ```
 
-Listens on port 3001 (configurable via `PORT` env var). The browser POSTs encrypted comparison results and gets back `>`, `<`, or `=`.
+It listens on port 3001 and exposes `/api/compare` (plus `/api/register`,
+`/api/relay`, `/api/encounter`, `/api/state`, `/api/contract`). The browser
+POSTs encrypted comparison results to `/api/compare` and gets back `>`, `<`,
+or `=`.
+
+A minimal standalone reference implementation lives at
+`fhe-wasm/oracle/server-example.mjs` — useful if you want to run the FHE
+comparison oracle without the rest of the app.
 
 ## Individual commands
 
@@ -181,7 +191,7 @@ fhe-wasm/
     traits.ts         TypeScript trait derivation (Node.js)
     merkle.ts         Merkle tree generator (keccak256, OZ StandardMerkleTree)
   oracle/
-    server.mjs        Oracle comparison endpoint (Node.js HTTP server)
+    server-example.mjs  Standalone reference oracle (production oracle is app/server.ts)
   dist/
     tfhe.js           Emscripten glue (built)
     tfhe.wasm         WASM binary (built)

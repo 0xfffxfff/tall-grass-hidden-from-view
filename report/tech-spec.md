@@ -43,13 +43,15 @@ The blockchain is not a wrapper around an off-chain piece. It is the verificatio
 
 3. **Position commitments via Poseidon.** Per-participant `Poseidon(x, y, salt)` commitments live on-chain as 32-byte hashes. Salts are derived deterministically from a per-participant `walkSecret` and a per-move counter, which keeps the commitment indistinguishable across moves while remaining recoverable by the participant.
 
-4. **FHE-encrypted entity traits with merkle commitments.** Entity ciphertexts (TFHE, ~110 KB per entity for 7 traits) are stored on IPFS. An `entityTraitMerkleRoot` is committed on-chain at deployment, with leaves ordered by entity index. Every encounter and every mint includes a Merkle proof verifying the served ciphertext against the on-chain root. The traits themselves are *permanently encrypted* — no decryption flow exists. Only homomorphic comparison is possible.
+4. **FHE-encrypted entity traits with merkle commitments.** Entity ciphertexts (TFHE, ~110 KB per entity for 7 traits) are committed on-chain at deployment as an `entityTraitMerkleRoot` with leaves ordered by entity index. Pre-mint, ciphertexts are served from IPFS for encounter and comparison flows; every served ciphertext is checked against the on-chain root via a Merkle proof. On mint, the relevant ciphertext is written to the token's metadata contract via chunked `SSTORE2` so the encrypted traits live permanently on-chain alongside the NFT. The traits themselves are *permanently encrypted* — no decryption flow exists. Only homomorphic comparison is possible.
 
 5. **On-chain encounter verification.** Minting requires a Noir proof (the `encounter` circuit) that the participant's current `positionCommitment` co-locates with an entity position derived from the committed seed. Public inputs include `seedCommitment`, `entityId`, `positionCommitments[msg.sender]`, `gridWidth`, `gridHeight`, the entity's `initialPositionCommitment`, and `blindingSeedCommitment`. The contract verifies the proof, the Merkle inclusion of the trait hash, and the mint payment in a single atomic transaction. Encounters cannot be faked: a participant has to actually be at the entity's cell to mint.
 
 6. **ZK proofs of correct FHE decryption.** When the oracle decrypts the boolean output of a homomorphic comparison, it emits a Noir proof attesting that the decryption was performed under the secret key whose Poseidon commitment (`decryptionKeyCommitment`) was fixed at deployment. The browser verifies this proof locally against the on-chain commitment. The oracle's honesty is enforced per comparison.
 
 7. **Owner-controlled entity movement after mint.** Entities that have been minted move under their owner's control via a separate Noir circuit. Direction commitments are blinded with a per-entity `blinding_seed = Poseidon(seed, entityId)`; only the owner and the oracle can decode them. The contract emits `EntityMoved(entityId, directionCommitment, moveCounter)` events that drive the monolith's visual without leaking owner intent.
+
+The contract is not upgradeable — there is no proxy and no admin path that can replace circuit verifiers, the seed commitment, the terrain root, the entity trait root, the decryption-key commitment, the grid dimensions, or the total supply. Three owner-only mutators exist: `setMintPrice` (retained so a long-running deployment can absorb ETH/EUR drift), `setMetadataContract` (the metadata contract is a separate address that can be swapped to fix display issues or evolve the rendering surface), and a metadata-pointers setter for the same reason. None of these can alter the cryptographic substrate: the on-chain `entityTraitMerkleRoot` binds each entity to its specific ciphertext hash at deployment, so a replaced metadata contract cannot change what an entity's encrypted traits are — only how they are presented.
 
 ### 2.2 Why this is not "basic NFT functionality"
 
@@ -86,8 +88,7 @@ The full stack is open source under GPL-3.0:
 - Noir circuits (`circuits/`) — movement, entity movement, encounter, decryption verification.
 - Solidity contracts (`contracts/`) — Foundry + Hardhat dual setup. Includes generated Honk verifier contracts.
 - TFHE C library v1.1 (Apache 2.0) compiled to WASM via emscripten (`fhe-wasm/`). Vendored upstream and built from source.
-- Frontend (`app/`) — wagmi + viem + React 19 + Vite.
-- Oracle (`server/`) — Hono HTTP server (Node.js).
+- Frontend and oracle (`app/`) — wagmi + viem + React 19 + Vite for the browser; `app/server.ts` is the production oracle (Hono HTTP server on Node.js).
 - Integration tests (`tests/`) — Noir prover/verifier exercised end-to-end against a local node.
 
 ### 3.2 Reproducibility
@@ -120,7 +121,7 @@ The work produced two technical artefacts that are useful outside *Tall Grass*. 
 Benchmarks (M1 Max):
 
 - Movement proof: ~1.1 s prove, ~0.2 s verify.
-- Entity movement proof, 32 entities: ~28.8 s prove, ~8.0 s verify.
+- Entity movement proof: ~28.8 s prove, ~8.0 s verify.
 - 8-bit FHE GT comparison (24 boolean gates): ~1.6 s in WASM.
 - 8-bit FHE EQ comparison (15 boolean gates): ~1.0 s in WASM.
 
