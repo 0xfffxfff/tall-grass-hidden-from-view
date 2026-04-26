@@ -9,3 +9,5 @@ import "./upload-ciphertext";
 import "./upload-entity-image";
 import "./upload-html";
 import "./view-token";
+import "./mint";
+import "./setup-assets";
