@@ -16,6 +16,7 @@ import { join } from "path";
 import {
   Wallet,
   JsonRpcProvider,
+  FallbackProvider,
   Contract,
   keccak256,
   concat,
@@ -25,6 +26,41 @@ import {
   verifyMessage,
   ZeroHash,
 } from "ethers";
+
+const SEPOLIA_PUBLIC_RPCS = [
+  "https://ethereum-sepolia-rpc.publicnode.com",
+  "https://1rpc.io/sepolia",
+  "https://sepolia.gateway.tenderly.co",
+];
+
+const POLL_INTERVAL_MS = 12_500;
+
+function buildProvider(rpcUrl: string): JsonRpcProvider | FallbackProvider {
+  const isLocal = /(?:localhost|127\.0\.0\.1)/.test(rpcUrl);
+  if (isLocal) {
+    return new JsonRpcProvider(rpcUrl, undefined, {
+      pollingInterval: POLL_INTERVAL_MS,
+    });
+  }
+  const configs = [
+    ...SEPOLIA_PUBLIC_RPCS.map((url, i) => ({
+      provider: new JsonRpcProvider(url),
+      priority: i + 1,
+      stallTimeout: 2_000,
+      weight: 1,
+    })),
+    {
+      provider: new JsonRpcProvider(rpcUrl),
+      priority: 99,
+      stallTimeout: 2_000,
+      weight: 1,
+    },
+  ];
+  return new FallbackProvider(configs, undefined, {
+    quorum: 1,
+    pollingInterval: POLL_INTERVAL_MS,
+  });
+}
 import type { PoseidonHasher } from "circomlibjs";
 
 const require = createRequire(import.meta.url);
@@ -120,7 +156,7 @@ interface Services {
   poseidon: PoseidonHasher;
   oracleWallet: Wallet;
   masterSecret: bigint;
-  provider: JsonRpcProvider;
+  provider: JsonRpcProvider | FallbackProvider;
   contract: Contract | null;
   encounterNoir: NoirInstance | null;
   encounterBackend: BackendInstance | null;
@@ -491,7 +527,7 @@ async function init(): Promise<void> {
   // 2. ethers + oracle signer
   console.log("Loading ethers...");
   const oracleWallet = new Wallet(config.ORACLE_PRIVATE_KEY);
-  const provider = new JsonRpcProvider(config.RPC_URL);
+  const provider = buildProvider(config.RPC_URL);
   const oracleSigner = oracleWallet.connect(provider);
   console.log(`  Oracle address: ${oracleWallet.address}`);
 
