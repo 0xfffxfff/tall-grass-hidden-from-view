@@ -26,7 +26,7 @@ function loadMerkle(file: string): MerkleTree {
 
 task("artist-mint", "Owner-only mint of an entity (artist proof)")
   .addParam("id", "Entity ID to mint", undefined, types.int)
-  .addOptionalParam("to", "Recipient address (default: deployer)")
+  .addParam("to", "Recipient address")
   .addOptionalParam(
     "merkle",
     "Path to merkle.json with traitHash + proof per entity",
@@ -50,9 +50,7 @@ task("artist-mint", "Owner-only mint of an entity (artist proof)")
       throw new Error(`No entry for id ${id} in ${taskArgs.merkle}`);
     }
 
-    const [signer] = await hre.ethers.getSigners();
-    const to = taskArgs.to || signer.address;
-
+    const to = taskArgs.to;
     const token = await getTokenContract(hre);
     console.log(
       `Artist-minting #${id} -> ${to}\n  traitHash: ${entry.ciphertextHash}\n  proof:     ${entry.proof.length} sibling(s)`,
