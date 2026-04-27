@@ -493,9 +493,10 @@ async function main() {
 
   // 15. Old owner cannot recover entity secrets
   step("Verifying old owner cannot recover entity");
-  const oldOwnerSig = castSign(`tall_grass:recover:${encounter.entityId}`, PRIVKEY);
+  const oldOwnerTs = Date.now();
+  const oldOwnerSig = castSign(`tall_grass:recover:${encounter.entityId}:${oldOwnerTs}`, PRIVKEY);
   try {
-    await api("POST", `/api/entity/${encounter.entityId}/recover`, { signature: oldOwnerSig });
+    await api("POST", `/api/entity/${encounter.entityId}/recover`, { signature: oldOwnerSig, timestamp: oldOwnerTs });
     console.error("  Old owner recovered entity — should have been rejected!");
     process.exit(1);
   } catch (e) {
@@ -508,8 +509,9 @@ async function main() {
 
   // 16. New owner recovers entity secrets via oracle
   step("Recovering entity secrets as new owner");
-  const newOwnerSig = castSign(`tall_grass:recover:${encounter.entityId}`, PRIVKEY2);
-  const recovery = await api("POST", `/api/entity/${encounter.entityId}/recover`, { signature: newOwnerSig });
+  const newOwnerTs = Date.now();
+  const newOwnerSig = castSign(`tall_grass:recover:${encounter.entityId}:${newOwnerTs}`, PRIVKEY2);
+  const recovery = await api("POST", `/api/entity/${encounter.entityId}/recover`, { signature: newOwnerSig, timestamp: newOwnerTs });
   info(`Entity position: (${recovery.x}, ${recovery.y})`);
   info(`Blinding seed: ${recovery.blindingSeed.slice(0, 18)}...`);
   info(`Move count: ${recovery.moveCount}`);

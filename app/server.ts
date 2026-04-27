@@ -1120,9 +1120,15 @@ async function handleEntityRecover(url: string, body: string): Promise<ApiRespon
     return { status: 400, body: { error: `Invalid entityId (0-${config.ENTITY_COUNT - 1})` } };
   }
 
-  const { signature } = JSON.parse(body) as { signature?: string };
+  const { signature, timestamp } = JSON.parse(body) as { signature?: string; timestamp?: number };
   if (!signature) {
     return { status: 400, body: { error: "Missing signature" } };
+  }
+  if (typeof timestamp !== "number" || !Number.isFinite(timestamp)) {
+    return { status: 400, body: { error: "Missing or invalid timestamp" } };
+  }
+  if (Math.abs(Date.now() - timestamp) > 60_000) {
+    return { status: 400, body: { error: "Signature expired or timestamp out of range" } };
   }
 
   const contract = svc.contract;
@@ -1137,7 +1143,7 @@ async function handleEntityRecover(url: string, body: string): Promise<ApiRespon
   }
 
   // Verify caller is the entity owner
-  const message = `tall_grass:recover:${entityId}`;
+  const message = `tall_grass:recover:${entityId}:${timestamp}`;
   let signer: string;
   try {
     signer = verifyMessage(message, signature);
