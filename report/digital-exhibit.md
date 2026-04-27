@@ -13,7 +13,7 @@ By 0xfff. Submitted to the Pixel Prize, JUST Open Source Stiftung, 2026.
 | **Title** | Tall Grass (Hidden From View) |
 | **Artist** | 0xfff |
 | **Year** | 2026 |
-| **Network (testnet)** | Sepolia, contract address: `<TESTNET_ADDRESS>` |
+| **Network (testnet)** | Sepolia, contract address: [`0xf26D57A329a84493E9bb0541A1A2e22409180d1F`](https://sepolia.etherscan.io/address/0xf26D57A329a84493E9bb0541A1A2e22409180d1F) |
 | **Frontend (live)** | <https://tallgrass.0xfff.love/> |
 | **Source repository** | <https://github.com/0xfffxfff/tall-grass-hidden-from-view> (GPL-3.0) |
 
@@ -41,7 +41,7 @@ The piece is a hidden landscape on Ethereum. Visitors enter and walk through it.
 
 In cryptography, privacy tends to be solitary. My key, my data, my asset. *Tall Grass* makes it collective and spatial. Multiple participants share the same hidden world. They are present together, mutually invisible. Their movements affect a shared state. They can encounter entities others have already touched. Privacy here is not a property of a person or an object. It is a property of the space they share. This is what interests me most about the piece. Privacy that isolates an individual is well understood. Privacy that holds a public together is not.
 
-The Monolith is the work's body in the room: two screens, mounted back to back, reading the contract in real time. Slow forms drift at right angles through a dark field — encounters resolving, comparisons computing, participants moving through. Visitors navigate but cannot see. Entities are compared but cannot be read. The Monolith moves but cannot be deciphered. It sits in the older tradition of veil-painting and silent volume.
+The Monolith is the work's body in the room: two screens, mounted back to back, reading the contract in real time. Slow forms drift at right angles through a dark field — encounters resolving, comparisons computing, participants moving through. Visitors navigate but cannot see. Entities are compared but cannot be read. The Monolith moves but cannot be deciphered.
 
 The work is honest about what is not yet possible. An oracle holds the landscape's seed; today the artist chooses not to look. The next version makes the choice unnecessary: a hardware enclave the artist cannot read, and cryptographic terrain reveals that remove the oracle's knowledge entirely. The proposed sculpture — a frosted-glass body with mechanical parts behind the haze — is also deferred to that delivery; for the grantee exhibition the Monolith is realised as a screen-based study. *Tall Grass* sits in a pivot in my practice. Earlier work — *World Computer Sculpture Garden*, *You Are Here*, *Honest Work* — treated smart contracts as durable objects whose transparency was their material. This piece inverts that thesis: a hidden program with public proof of private action.
 
