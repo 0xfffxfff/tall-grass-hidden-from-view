@@ -64,11 +64,19 @@ task("setup-assets", "Upload HTML viewer + per-entity previews + ciphertexts to 
         console.warn(`\n[images] ${previewsRoot} not found — skipping`);
       } else {
         console.log(`\n[images] uploading ids ${fromId}..${toId} from ${previewsRoot}`);
-        await hre.run("upload-entity-images", {
-          dir: previewsRoot,
-          from: fromId,
-          to: toId,
-        });
+        for (let id = fromId; id <= toId; id++) {
+          const filePath = path.join(previewsRoot, `${id}.jpg`);
+          if (!fs.existsSync(filePath)) {
+            console.warn(`   skip ${id}: ${filePath} not found`);
+            continue;
+          }
+          const partsCount = await metadata.entityImagePartsCount(id);
+          if (Number(partsCount) > 0) {
+            console.log(`   skip ${id}: already on chain (${partsCount} chunk(s))`);
+            continue;
+          }
+          await hre.run("upload-entity-image", { id: String(id), file: filePath });
+        }
       }
     }
 
