@@ -1337,9 +1337,12 @@ app.use("/data/*", serveStatic({
   rewriteRequestPath: (path) => path.replace(/^\/data/, ""),
 }));
 
-// Static: /* — Vite build output (production SPA)
-app.use("*", serveStatic({ root: config.DIST_DIR }));
-app.get("*", serveStatic({ root: config.DIST_DIR, rewriteRequestPath: () => "/index.html" }));
+// Static: /* — Vite build output (production SPA).
+// Skipped on hosts where the SPA lives elsewhere (e.g. Netlify) and dist/ is absent.
+if (existsSync(config.DIST_DIR)) {
+  app.use("*", serveStatic({ root: config.DIST_DIR }));
+  app.get("*", serveStatic({ root: config.DIST_DIR, rewriteRequestPath: () => "/index.html" }));
+}
 
 // ---------------------------------------------------------------------------
 // Start
