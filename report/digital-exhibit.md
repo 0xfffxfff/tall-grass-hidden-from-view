@@ -43,7 +43,7 @@ In cryptography, privacy tends to be solitary. My key, my data, my asset. *Tall 
 
 The Monolith is the work's body in the room: two screens, mounted back to back, reading the contract in real time. Slow forms drift at right angles through a dark field — encounters resolving, comparisons computing, participants moving through. Visitors navigate but cannot see. Entities are compared but cannot be read. The Monolith moves but cannot be deciphered.
 
-The work is honest about what is not yet possible. An oracle holds the landscape's seed; today the artist chooses not to look. The next version makes the choice unnecessary: a hardware enclave the artist cannot read, and cryptographic terrain reveals that remove the oracle's knowledge entirely. The proposed sculpture — a frosted-glass body with mechanical parts behind the haze — is also deferred to that delivery; for the grantee exhibition the Monolith is realised as a screen-based study. *Tall Grass* sits in a pivot in my practice. Earlier work — *World Computer Sculpture Garden*, *You Are Here*, *Honest Work* — treated smart contracts as durable objects whose transparency was their material. This piece inverts that thesis: a hidden program with public proof of private action.
+The work is honest about what is not yet possible. An oracle holds the landscape's seed; today the artist chooses not to look. The next version makes the choice unnecessary: a hardware enclave the artist cannot read, and cryptographic terrain reveals that remove the oracle's knowledge entirely. The proposed sculpture — a frosted-glass body with mechanical parts behind the haze — is also deferred to that delivery; for the grantee exhibition the Monolith is realised as a screen-based study. *[Tall Grass](https://tallgrass.0xfff.love/)* sits in a pivot in my practice. Earlier work — *[World Computer Sculpture Garden](https://worldcomputersculpture.garden/)*, *[You Are Here](https://youarehere.0xfff.love/)*, *[Honest Work](https://honestwork.0xfff.love/)* — treated smart contracts as durable objects whose transparency was their material. This piece inverts that thesis: a hidden program with public proof of private action.
 
 Privacy is defended as a human right by listing what we are entitled to hide. *Tall Grass* makes the opposite argument. When privacy is the medium, it produces forms that visibility cannot.
 
@@ -75,11 +75,11 @@ When a participant lands on a tall grass cell occupied by an entity, an encounte
 
 The Monolith is the physical surface of the work in the room: two displays mounted back to back, reading the contract in real time. The visual is a generative field — axis-aligned slabs and sweeps drifting through dark space, each form a kinetic signature derived from a ciphertext, a comparison pair, or a move. Forms surface, peak, and resolve back into the field; the Monolith is steady, responsive churn, never going fully dark. The work is visible but illegible: present but unreadable. For the May 1 grantee exhibition the Monolith is realised as a screen-based study; the proposed frosted-glass body with mechanical parts behind the haze is grand-prize scope.
 
-The whole stack — Noir circuits, Solidity contracts, TFHE C compiled to WebAssembly, the frontend, the oracle — is open source under GPL-3.0.
+The whole stack — Noir circuits, Solidity contracts, TFHE C compiled to WebAssembly, the frontend, the oracle — is [open source](https://github.com/0xfffxfff/tall-grass-hidden-from-view) under GPL-3.0.
 
 ### 3.4 Credits
 
-- Concept, code, sculpture: 0xfff
+- Artist: 0xfff
 - Funded by The Pixel Prize / JUST Open Source Stiftung
 - License: GPL-3.0 (whole stack)
-- Chain: Ethereum (Sepolia for jury access, Mainnet for production)
+- Network: Ethereum Mainnet
