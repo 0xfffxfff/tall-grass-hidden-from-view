@@ -48,6 +48,7 @@ const config: HardhatUserConfig = {
     sepolia: {
       accounts: process.env.DEPLOYER_KEY ? [process.env.DEPLOYER_KEY] : [],
       url: process.env.RPC_URL || "",
+      chainId: 11155111,
     },
     mainnet: {
       accounts: process.env.DEPLOYER_KEY ? [process.env.DEPLOYER_KEY] : [],

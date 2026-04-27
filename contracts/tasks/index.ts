@@ -12,3 +12,4 @@ import "./view-token";
 import "./mint";
 import "./setup-assets";
 import "./transfer";
+import "./verify-etherscan";
