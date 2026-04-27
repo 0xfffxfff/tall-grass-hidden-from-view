@@ -35,15 +35,15 @@ By 0xfff. Submitted to the Pixel Prize, JUST Open Source Stiftung, 2026.
 
 ![Tall Grass (Hidden From View)](/exhibit2.jpg)
 
-Privacy is usually defended. *Tall Grass (Hidden From View)* treats it as a generative material.
+Privacy is usually defended. In *Tall Grass (Hidden From View)* I'm looking at it as a generative material.
 
 The piece is a hidden landscape on Ethereum. Visitors enter and walk through it. Their positions are private — to the contract, to the artist, and to each other. They can encounter shrouded entities and collect them. Each entity has fully homomorphically encrypted traits. Anyone may compare two entities; the chain publishes only the direction of the result. The underlying values are never revealed. Every move is verified by a zero-knowledge proof: the contract verifies the move was valid without learning where it happened.
 
-In cryptography, privacy tends to be solitary. My key, my data, my asset. *Tall Grass* makes it collective and spatial. Multiple participants share the same hidden world. They are present together, mutually invisible. Their movements affect a shared state. They can encounter entities others have already touched. Privacy here is not a property of a person or an object. It is a property of the space they share. This is what interests me most about the piece. Privacy that isolates an individual is well understood. Privacy that holds a public together is not.
+In cryptography, privacy tends to be solitary. My key, my data, my asset. *Tall Grass* makes it collective and spatial. Multiple participants share the same hidden world. They are present together, mutually invisible. Their movements affect a shared state. They can encounter entities others have already touched. Privacy here is not a property of a person or an object. It is a property of the space they share. This is what interests me most about the piece. Privacy that isolates an individual is well understood. Privacy that holds a public together is not. This is closer to what Édouard Glissant called the right to opacity: not refusal of relation but its condition.
 
 The Monolith is the work's body in the room: two screens, mounted back to back, reading the contract in real time. Slow forms drift at right angles through a dark field — encounters resolving, comparisons computing, participants moving through. Visitors navigate but cannot see. Entities are compared but cannot be read. The Monolith moves but cannot be deciphered.
 
-The work is honest about what is not yet possible. An oracle holds the landscape's seed; today the artist chooses not to look. The next version makes the choice unnecessary: a hardware enclave the artist cannot read, and cryptographic terrain reveals that remove the oracle's knowledge entirely. The proposed sculpture — a frosted-glass body with mechanical parts behind the haze — is also deferred to that delivery; for the grantee exhibition the Monolith is realised as a screen-based study. *[Tall Grass](https://tallgrass.0xfff.love/)* sits in a pivot in my practice. Earlier work — *[World Computer Sculpture Garden](https://worldcomputersculpture.garden/)*, *[You Are Here](https://youarehere.0xfff.love/)*, *[Honest Work](https://honestwork.0xfff.love/)* — treated smart contracts as durable objects whose transparency was their material. This piece inverts that thesis: a hidden program with public proof of private action.
+The work is honest about what is not yet possible. An oracle holds the landscape's seed; today I choose not to look. The next version makes the choice unnecessary: a hardware enclave I can't read, and cryptographic terrain reveals that remove the oracle's knowledge entirely. The proposed sculpture — a frosted-glass body with mechanical parts behind the haze — is also deferred to that delivery; for the grantee exhibition the Monolith is realised as a screen-based study. *[Tall Grass](https://tallgrass.0xfff.love/)* is a shift from earlier work I made under this pseudonym — from smart contracts as durable objects whose transparency was the material, to a hidden program with public proof of private action.
 
 Privacy is defended as a human right by listing what we are entitled to hide. *Tall Grass* makes the opposite argument. When privacy is the medium, it produces forms that visibility cannot.
 
@@ -63,7 +63,7 @@ An interactive piece for visitors to navigate an encrypted digital landscape usi
 
 At the center of the work stands the Monolith: a glowing frosted-glass sculpture. Though its inner workings are obscured, it responds in real time to every action taken in the encrypted landscape: a physical body translating invisible computation into visible motion.
 
-Tall Grass treats privacy not as a barrier, but as a creative medium. It asks us to consider what interaction, ownership, and even presence mean when they are liberated from observation, and what kind of world becomes possible when we can prove what we've done without ever revealing who we are.
+Tall Grass treats privacy not as a barrier, but as a creative medium. Visitors interact without being observed, hold property whose contents cannot be read, and share a space they cannot see each other inside. What becomes possible inside those conditions is the work's question.
 
 ### 3.3 Long description (~300 words)
 
@@ -75,7 +75,7 @@ When a participant lands on a tall grass cell occupied by an entity, an encounte
 
 The Monolith is the physical surface of the work in the room: two displays mounted back to back, reading the contract in real time. The visual is a generative field — axis-aligned slabs and sweeps drifting through dark space, each form a kinetic signature derived from a ciphertext, a comparison pair, or a move. Forms surface, peak, and resolve back into the field; the Monolith is steady, responsive churn, never going fully dark. The work is visible but illegible: present but unreadable. For the May 1 grantee exhibition the Monolith is realised as a screen-based study; the proposed frosted-glass body with mechanical parts behind the haze is grand-prize scope.
 
-The whole stack — Noir circuits, Solidity contracts, TFHE C compiled to WebAssembly, the frontend, the oracle — is [open source](https://github.com/0xfffxfff/tall-grass-hidden-from-view) under GPL-3.0.
+Everything — Noir circuits, Solidity contracts, TFHE C compiled to WebAssembly, the frontend, the oracle — is [open source](https://github.com/0xfffxfff/tall-grass-hidden-from-view) under GPL-3.0.
 
 ### 3.4 Credits
 

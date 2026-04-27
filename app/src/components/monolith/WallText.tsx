@@ -21,8 +21,8 @@ export function WallText() {
         hidden program &mdash; appears at the visitor&rsquo;s position; they
         may attempt to collect it. Each entity carries encrypted traits. Anyone
         can compare two entities homomorphically: the comparison returns
-        greater, less, or equal; the underlying values stay sealed. Comparisons
-        accumulate slowly, locally, through hours of browser computation.
+        greater, less, or equal; the underlying values stay sealed. Each
+        comparison is a few seconds of browser computation; they accumulate.
       </p>
       <p>
         Visitors navigate but cannot see. Entities are compared but cannot be
