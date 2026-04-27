@@ -42,9 +42,7 @@ contract Deploy is Script {
 
         TallGrass tg = new TallGrass(
             vm.envBytes32("SEED_COMMITMENT"),
-            vm.envBytes32("TERRAIN_MERKLE_ROOT"),
             vm.envBytes32("ENTITY_TRAIT_MERKLE_ROOT"),
-            vm.envBytes32("ENTITY_MERKLE_ROOT"),
             vm.envUint("GRID_WIDTH"),
             vm.envUint("GRID_HEIGHT"),
             vm.envUint("TOTAL_SUPPLY"),

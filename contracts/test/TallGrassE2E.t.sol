@@ -25,9 +25,7 @@ contract TallGrassE2ETest is Test {
 
         tg = new TallGrass(
             bytes32(uint256(0xdead)),               // seedCommitment (not tested here)
-            bytes32(uint256(0xbeef)),               // terrainMerkleRoot (not tested here)
             bytes32(uint256(0xcafe)),               // entityTraitMerkleRoot (not tested here)
-            bytes32(uint256(0xfeed)),               // entityMerkleRoot (not tested here)
             32,                                     // gridWidth
             32,                                     // gridHeight
             32,                                     // totalSupply

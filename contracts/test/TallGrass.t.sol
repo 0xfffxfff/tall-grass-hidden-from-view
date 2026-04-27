@@ -34,9 +34,7 @@ contract TallGrassTest is Test {
     address internal bob = address(0x2);
 
     bytes32 constant SEED_COMMITMENT = bytes32(uint256(0xdead));
-    bytes32 constant TERRAIN_ROOT = bytes32(uint256(0xbeef));
     bytes32 constant ENTITY_TRAIT_ROOT = bytes32(uint256(0xcafe));
-    bytes32 constant ENTITY_ROOT = bytes32(uint256(0xfeed));
     uint256 constant GRID_WIDTH = 32;
     uint256 constant GRID_HEIGHT = 32;
     uint256 constant TOTAL_SUPPLY = 32;
@@ -51,9 +49,7 @@ contract TallGrassTest is Test {
 
         tg = new TallGrass(
             SEED_COMMITMENT,
-            TERRAIN_ROOT,
             ENTITY_TRAIT_ROOT,
-            ENTITY_ROOT,
             GRID_WIDTH,
             GRID_HEIGHT,
             TOTAL_SUPPLY,
@@ -855,9 +851,7 @@ contract TallGrassTest is Test {
     function _deployWith(bytes32 traitRoot) internal returns (TallGrass) {
         TallGrass newTg = new TallGrass(
             SEED_COMMITMENT,
-            TERRAIN_ROOT,
             traitRoot,
-            ENTITY_ROOT,
             GRID_WIDTH,
             GRID_HEIGHT,
             TOTAL_SUPPLY,

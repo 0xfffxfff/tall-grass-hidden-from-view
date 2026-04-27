@@ -30,9 +30,7 @@ contract TallGrassMetadataTest is Test {
 
         tg = new TallGrass(
             bytes32(uint256(0xdead)),  // seedCommitment
-            bytes32(uint256(0xbeef)),  // terrainMerkleRoot
             bytes32(uint256(0xcafe)),  // entityTraitMerkleRoot
-            bytes32(uint256(0xfeed)),  // entityMerkleRoot
             32, 32, 32,               // grid, supply
             0.2 ether,                 // mintPrice
             address(mv),

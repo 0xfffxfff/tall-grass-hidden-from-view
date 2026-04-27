@@ -61,7 +61,6 @@ contract TallGrass is ERC721, OwnableRoles {
     // -----------------------------------------------------------------------
 
     bytes32 public immutable seedCommitment;
-    bytes32 public immutable terrainMerkleRoot;
     bytes32 public immutable entityTraitMerkleRoot;
     uint256 public immutable gridWidth;
     uint256 public immutable gridHeight;
@@ -70,7 +69,6 @@ contract TallGrass is ERC721, OwnableRoles {
     IVerifier public immutable movementVerifier;
     IVerifier public immutable entityMovementVerifier;
     IVerifier public immutable encounterVerifier;
-    bytes32 public immutable entityMerkleRoot;
     bytes32 public immutable decryptionKeyCommitment;
     bytes32 public immutable traitModuliCommitment;
 
@@ -107,9 +105,7 @@ contract TallGrass is ERC721, OwnableRoles {
 
     constructor(
         bytes32 _seedCommitment,
-        bytes32 _terrainMerkleRoot,
         bytes32 _entityTraitMerkleRoot,
-        bytes32 _entityMerkleRoot,
         uint256 _gridWidth,
         uint256 _gridHeight,
         uint256 _totalSupply,
@@ -122,9 +118,7 @@ contract TallGrass is ERC721, OwnableRoles {
         address _owner
     ) {
         seedCommitment = _seedCommitment;
-        terrainMerkleRoot = _terrainMerkleRoot;
         entityTraitMerkleRoot = _entityTraitMerkleRoot;
-        entityMerkleRoot = _entityMerkleRoot;
         gridWidth = _gridWidth;
         gridHeight = _gridHeight;
         totalSupply = _totalSupply;
