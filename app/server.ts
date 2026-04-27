@@ -35,6 +35,8 @@ const SEPOLIA_PUBLIC_RPCS = [
 
 const POLL_INTERVAL_MS = 12_500;
 
+const SEPOLIA_CHAIN_ID = 11155111;
+
 function buildProvider(rpcUrl: string): JsonRpcProvider | FallbackProvider {
   const isLocal = /(?:localhost|127\.0\.0\.1)/.test(rpcUrl);
   if (isLocal) {
@@ -42,21 +44,23 @@ function buildProvider(rpcUrl: string): JsonRpcProvider | FallbackProvider {
       pollingInterval: POLL_INTERVAL_MS,
     });
   }
+  const mk = (url: string) =>
+    new JsonRpcProvider(url, SEPOLIA_CHAIN_ID, { staticNetwork: true });
   const configs = [
     ...SEPOLIA_PUBLIC_RPCS.map((url, i) => ({
-      provider: new JsonRpcProvider(url),
+      provider: mk(url),
       priority: i + 1,
       stallTimeout: 2_000,
       weight: 1,
     })),
     {
-      provider: new JsonRpcProvider(rpcUrl),
+      provider: mk(rpcUrl),
       priority: 99,
       stallTimeout: 2_000,
       weight: 1,
     },
   ];
-  return new FallbackProvider(configs, undefined, {
+  return new FallbackProvider(configs, SEPOLIA_CHAIN_ID, {
     quorum: 1,
     pollingInterval: POLL_INTERVAL_MS,
   });
@@ -158,6 +162,7 @@ interface Services {
   masterSecret: bigint;
   provider: JsonRpcProvider | FallbackProvider;
   contract: Contract | null;
+  deployBlock: number;
   encounterNoir: NoirInstance | null;
   encounterBackend: BackendInstance | null;
   decryptionNoir: NoirInstance | null;
@@ -402,7 +407,8 @@ async function recoverFromChain(contract: Contract): Promise<void> {
 
   // 1. Scan Registered events -> find all participants
   const regEvents = await contract.queryFilter(
-    contract.filters.Registered()
+    contract.filters.Registered(),
+    svc.deployBlock,
   );
   console.log(`  Found ${regEvents.length} registrations.`);
 
@@ -412,7 +418,8 @@ async function recoverFromChain(contract: Contract): Promise<void> {
 
     // 2. Scan Moved events for this participant
     const movedEvents = await contract.queryFilter(
-      contract.filters.Moved(address)
+      contract.filters.Moved(address),
+      svc.deployBlock,
     );
 
     const sorted = movedEvents
@@ -440,7 +447,7 @@ async function recoverFromChain(contract: Contract): Promise<void> {
 
   // 4. Recover minted entities
   mintedEntities.clear();
-  const mintEvents = await contract.queryFilter(contract.filters.Minted());
+  const mintEvents = await contract.queryFilter(contract.filters.Minted(), svc.deployBlock);
   for (const event of mintEvents) {
     const args = (event as unknown as { args: { entityId: bigint } }).args;
     mintedEntities.add(Number(args.entityId));
@@ -683,7 +690,8 @@ async function init(): Promise<void> {
   // Assign services
   svc = {
     poseidon, oracleWallet, masterSecret,
-    provider, contract: null, encounterNoir, encounterBackend,
+    provider, contract: null, deployBlock: 0,
+    encounterNoir, encounterBackend,
     decryptionNoir, decryptionBackend,
     fheModule, merkleData, manifestData,
     lweKeyBits, decryptionKeyCommitment,
@@ -696,10 +704,15 @@ async function init(): Promise<void> {
   // 7. Connect to deployed contract
   const deploymentPath = join(config.DEPLOYMENT_DIR, "TallGrass.json");
   if (existsSync(deploymentPath)) {
-    const deployment = JSON.parse(readFileSync(deploymentPath, "utf-8")) as { address: string; abi: string[] };
+    const deployment = JSON.parse(readFileSync(deploymentPath, "utf-8")) as {
+      address: string;
+      abi: string[];
+      receipt?: { blockNumber?: number };
+    };
     const contract = new Contract(deployment.address, deployment.abi, oracleSigner);
     svc.contract = contract;
-    console.log(`  Contract connected at ${deployment.address}\n`);
+    svc.deployBlock = deployment.receipt?.blockNumber ?? 0;
+    console.log(`  Contract connected at ${deployment.address} (deploy block ${svc.deployBlock})\n`);
 
     // 8. Recover state from chain + subscribe to live events
     await recoverFromChain(contract);
@@ -890,7 +903,7 @@ async function handleEncounter(body: string): Promise<ApiResponse> {
           }
           if (!found) {
             // Full replay if single-step decode fails
-            const movedEvents = await contract.queryFilter(contract.filters.Moved(address));
+            const movedEvents = await contract.queryFilter(contract.filters.Moved(address), svc.deployBlock);
             const sorted = movedEvents.sort((a, b) => a.blockNumber - b.blockNumber || a.index - b.index);
             const parsed = sorted.map((e) => ({
               newCommitment: BigInt((e as unknown as { args: { newCommitment: string } }).args.newCommitment),
@@ -1142,7 +1155,8 @@ async function handleEntityRecover(url: string, body: string): Promise<ApiRespon
 
   // Replay all EntityMoved events for this entity
   const movedEvents = await contract.queryFilter(
-    contract.filters.EntityMoved(entityId)
+    contract.filters.EntityMoved(entityId),
+    svc.deployBlock,
   );
 
   const parsed = movedEvents.map((e) => ({
