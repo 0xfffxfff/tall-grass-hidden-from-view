@@ -3,6 +3,9 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 
+const apiTarget = process.env.VITE_API_TARGET ?? "http://localhost:3000";
+const proxyOpts = { target: apiTarget, changeOrigin: true, secure: true };
+
 export default defineConfig({
   plugins: [
     react(),
@@ -27,8 +30,8 @@ export default defineConfig({
       allow: [path.resolve(__dirname, ".."), path.resolve(__dirname)],
     },
     proxy: {
-      "/api": "http://localhost:3000",
-      "/data": "http://localhost:3000",
+      "/api": proxyOpts,
+      "/data": proxyOpts,
     },
   },
   optimizeDeps: {

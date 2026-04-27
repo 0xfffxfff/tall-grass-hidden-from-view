@@ -48,7 +48,7 @@ export function TitleBar() {
 
   return (
     <p className="titlebar">
-      connected as <span className="addr">{address && shortAddr(address)}</span>
+      <span className="addr">{address && shortAddr(address)}</span>
       <span className="sep">&middot;</span>
       <button className="aff live" onClick={() => disconnect()}>
         disconnect

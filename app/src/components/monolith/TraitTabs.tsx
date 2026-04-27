@@ -18,7 +18,7 @@ export function TraitTabs({
             className={sel ? "sel" : undefined}
             onClick={() => onSelect(i)}
           >
-            {sel ? `[\u00B7${i}\u00B7]` : `[${i}]`}
+            {`[${i}]`}
           </a>
         );
       })}

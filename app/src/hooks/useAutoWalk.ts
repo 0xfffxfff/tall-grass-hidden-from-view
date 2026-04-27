@@ -306,6 +306,7 @@ export function useAutoWalk(inputs: AutoWalkInputs) {
   const pause = useCallback(() => {
     runningRef.current = false;
     setRunning(false);
+    setStatus("");
     workBus.end(WORK_ID);
   }, []);
 

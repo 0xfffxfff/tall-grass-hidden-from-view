@@ -426,7 +426,7 @@ export function WalkInline({
               onClick={() => canRelease && autoWalk.start()}
               disabled={!canRelease}
             >
-              release
+              autowalk
             </button>
           ) : (
             <button
@@ -523,6 +523,27 @@ export function WalkInline({
       <WorkStrip scope="walk" className="walk-work" />
       {ready === "registered" && liveStatus && !whyMessage && (
         <p className="walk-error">{liveStatus}</p>
+      )}
+      {ready === "registered" && autoWalk.history.length > 0 && (
+        <ul className="walk-history">
+          {autoWalk.history.slice(0, 6).map((step) => {
+            const dir = ["N", "S", "E", "W"][step.direction];
+            const word = ["north", "south", "east", "west"][step.direction];
+            return (
+              <li key={`${step.step}-${step.timestamp}`}>
+                <span className="dir">{dir}</span>
+                <span className="sep">&middot;</span>
+                <span>moved {word}</span>
+                {step.encounter && (
+                  <>
+                    <span className="sep">&middot;</span>
+                    <span className="meta">encounter</span>
+                  </>
+                )}
+              </li>
+            );
+          })}
+        </ul>
       )}
     </section>
   );

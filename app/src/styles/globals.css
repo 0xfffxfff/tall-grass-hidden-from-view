@@ -181,8 +181,8 @@
   -webkit-backdrop-filter: blur(6px);
   white-space: nowrap;
 }
-.titlebar, .titlebar * { text-transform: uppercase; font-size: 10px; }
-.titlebar .sep { color: var(--fg-ghost); padding: 0 8px; }
+p.titlebar, p.titlebar * { text-transform: uppercase; font-size: 12px; }
+.titlebar .sep { padding: 0 8px; }
 .titlebar .addr { color: var(--fg); }
 .titlebar .aff,
 .titlebar .aff:hover { border-bottom-color: transparent; }
@@ -262,7 +262,7 @@ body[data-state="registered"] .you {
 }
 .you .k { color: var(--fg-faint); margin-right: 6px; }
 .you .v { color: var(--fg-mid); }
-.you .sep { color: var(--fg-ghost); padding: 0 8px; }
+.you .sep { padding: 0 8px; }
 
 /* ------------------------------------------------------------------ */
 /*  WALK SECTION — inline affordances between canvas & grid           */
@@ -377,7 +377,7 @@ body[data-state="registered"] .you {
 .topup-form input:focus { border-bottom-color: var(--fg-faint); }
 .topup-form .kv-lab { color: var(--fg-dim); }
 .topup-form .kv     { color: var(--fg-mid); }
-.topup-form .sep-dot { color: var(--fg-ghost); padding: 0 4px; }
+.topup-form .sep-dot { padding: 0 4px; }
 
 /* small inline value next to an affordance label (e.g. pattern · random) */
 .aff .kv {
@@ -416,20 +416,37 @@ body[data-state="registered"] .you {
 }
 .work-strip .label { color: var(--fg); }
 .work-strip .elapsed { color: var(--fg-dim); }
-.work-strip .elapsed::before { content: "\00B7\00A0"; color: var(--fg-ghost); }
+.work-strip .elapsed::before { content: "\00B7\00A0"; }
 .work-strip .queue { color: var(--fg-faint); }
-.work-strip .queue .sep { color: var(--fg-ghost); padding: 0 4px; }
+.work-strip .queue .sep { padding: 0 4px; }
 
 /* per-section placement tweaks */
 .public-work { margin: 0 0 18px; }
 .enc-work { margin-top: 18px; }
-.walk-error {
+.walk .walk-error {
   color: var(--fg-mid);
   font-family: var(--font-mono);
   font-size: 12px;
   margin: 8px 0 0;
   max-width: 62ch;
 }
+.walk .walk-history {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--fg-dim);
+  max-width: 62ch;
+}
+.walk .walk-history li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 1px 0;
+}
+.walk .walk-history .dir { color: var(--fg-mid); min-width: 1ch; }
+.walk .walk-history .meta { color: var(--fg-mid); }
 .public-error {
   color: var(--fg-mid);
   font-family: var(--font-mono);
@@ -676,7 +693,7 @@ body[data-state="registered"] .you {
   margin-bottom: 1px;
   animation: live-pulse 2s ease-in-out infinite;
 }
-.status .right .live .sep { color: var(--fg-ghost); padding: 0 6px; }
+.status .right .live .sep { padding: 0 6px; }
 @keyframes live-pulse {
   0%, 100% { opacity: 0.35; }
   50%      { opacity: 1; }
@@ -806,7 +823,7 @@ body[data-state="registered"] .you {
   font-variant-numeric: tabular-nums;
 }
 .drill-head .id   { color: var(--fg); }
-.drill-head .sep  { color: var(--fg-ghost); padding: 0 8px; }
+.drill-head .sep  { padding: 0 8px; }
 .drill-head .yours { color: var(--fg-dim); margin-left: 8px; }
 .drill table {
   border-collapse: collapse;

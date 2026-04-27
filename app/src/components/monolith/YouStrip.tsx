@@ -16,7 +16,7 @@ export function YouStrip({ registered, steps, pendingEncounters }: Props) {
 
   return (
     <p className="you">
-      <span className="k">{registered ? "walking as" : "connected as"}</span>
+      {registered && <span className="k">walking as</span>}
       <span className="v">{shortAddr(address)}</span>
       {registered && (
         <>
