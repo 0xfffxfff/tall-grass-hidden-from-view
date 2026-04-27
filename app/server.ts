@@ -1323,6 +1323,30 @@ app.get("/api/state", apiRoute((c) => handleState(c.req.url)));
 app.get("/api/contract", apiRoute(() => handleContract()));
 app.get("/api/reveals", apiRoute((c) => handleReveals(c.req.url)));
 
+// Strict allowlist for /data/*. DATA_DIR holds operational artifacts the
+// oracle reads on boot (secret.key, manifest.json with plaintext traits and
+// landscape seed, merkle.json) — these must NEVER be served. Only the
+// ciphertexts and circuit artifacts the SPA actually needs are exposed.
+//
+// Everything allowlisted is bound to the deployment by on-chain commitments
+// and never changes, so we tag it immutable and skip revalidation.
+const PUBLIC_DATA_PATHS = new Set([
+  "/data/cloud.key",
+  "/data/tfhe.js",
+  "/data/tfhe.wasm",
+  "/data/movement.json",
+  "/data/decryption.json",
+]);
+app.use("/data/*", async (c, next) => {
+  const path = c.req.path;
+  const isEntityCiphertext = /^\/data\/entities\/\d+\.bin$/.test(path);
+  if (!isEntityCiphertext && !PUBLIC_DATA_PATHS.has(path)) {
+    return c.notFound();
+  }
+  c.header("Cache-Control", "public, max-age=31536000, immutable");
+  await next();
+});
+
 // Static: /data/tfhe.* — FHE WASM from fhe-wasm/dist/ (before general /data/*)
 app.get("/data/tfhe.js", serveStatic({ root: config.FHE_DIST, rewriteRequestPath: () => "/tfhe.js" }));
 app.get("/data/tfhe.wasm", serveStatic({ root: config.FHE_DIST, rewriteRequestPath: () => "/tfhe.wasm" }));

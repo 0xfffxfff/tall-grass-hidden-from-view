@@ -72,6 +72,7 @@ contract TallGrass is ERC721, OwnableRoles {
     IVerifier public immutable encounterVerifier;
     bytes32 public immutable entityMerkleRoot;
     bytes32 public immutable decryptionKeyCommitment;
+    bytes32 public immutable traitModuliCommitment;
 
     // -----------------------------------------------------------------------
     // Mutable state
@@ -117,6 +118,7 @@ contract TallGrass is ERC721, OwnableRoles {
         address _entityMovementVerifier,
         address _encounterVerifier,
         bytes32 _decryptionKeyCommitment,
+        bytes32 _traitModuliCommitment,
         address _owner
     ) {
         seedCommitment = _seedCommitment;
@@ -131,6 +133,7 @@ contract TallGrass is ERC721, OwnableRoles {
         entityMovementVerifier = IVerifier(_entityMovementVerifier);
         encounterVerifier = IVerifier(_encounterVerifier);
         decryptionKeyCommitment = _decryptionKeyCommitment;
+        traitModuliCommitment = _traitModuliCommitment;
         _initializeOwner(_owner);
     }
 

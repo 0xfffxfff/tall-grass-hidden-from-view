@@ -69,6 +69,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       entityMovementVerifier.address,
       encounterVerifier.address,
       process.env.DECRYPTION_KEY_COMMITMENT || "0x0000000000000000000000000000000000000000000000000000000000000000",
+      process.env.TRAIT_MODULI_COMMITMENT || "0x0000000000000000000000000000000000000000000000000000000000000000",
       deployer,
     ],
     log: true,

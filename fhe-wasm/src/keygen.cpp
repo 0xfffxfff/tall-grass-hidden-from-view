@@ -45,6 +45,24 @@ static bool hex_to_bytes(const char* hex, vector<uint8_t>& out) {
     return true;
 }
 
+// Seed TFHE's PRNG from /dev/urandom. Without it the keyset is deterministic.
+// Call before every new_random_gate_bootstrapping_secret_keyset.
+static void seed_tfhe_prng() {
+    uint32_t seed[16];
+    ifstream urandom("/dev/urandom", ios::binary);
+    if (!urandom) {
+        fprintf(stderr, "Error: /dev/urandom unavailable\n");
+        exit(1);
+    }
+    urandom.read(reinterpret_cast<char*>(seed), sizeof(seed));
+    if (urandom.gcount() != sizeof(seed)) {
+        fprintf(stderr, "Error: short read from /dev/urandom\n");
+        exit(1);
+    }
+    urandom.close();
+    tfhe_random_generator_setSeed(seed, 16);
+}
+
 static void bytes_to_hex(const uint8_t* data, size_t len, char* out) {
     for (size_t i = 0; i < len; i++)
         snprintf(out + i * 2, 3, "%02x", data[i]);
@@ -53,8 +71,43 @@ static void bytes_to_hex(const uint8_t* data, size_t len, char* out) {
 
 // --- Trait derivation ---
 
-// SHA-256(seed || entity_index_le32 || trait_index_le32)[0]
+// Per-trait moduli: I..VII map to trait_index 0..6.
+// Loaded at runtime from the TRAIT_MODULI env var (e.g. "N1,N2,...").
+// Kept out of source so the schema (which trait is binary, etc.) stays private;
+// commitment to these values is bound on-chain via traitModuliCommitment.
+static uint16_t TRAIT_MODULI[16];
+static uint32_t TRAIT_MODULI_COUNT = 0;
+
+static void load_trait_moduli() {
+    if (TRAIT_MODULI_COUNT > 0) return; // already loaded
+    const char* env = getenv("TRAIT_MODULI");
+    if (!env || !*env) {
+        fprintf(stderr, "Error: TRAIT_MODULI env var required (e.g. \"N1,N2,...\")\n");
+        exit(1);
+    }
+    string s(env);
+    size_t pos = 0;
+    while (pos < s.size() && TRAIT_MODULI_COUNT < 16) {
+        size_t comma = s.find(',', pos);
+        string tok = s.substr(pos, (comma == string::npos ? s.size() : comma) - pos);
+        int v = atoi(tok.c_str());
+        if (v < 1 || v > 65535) {
+            fprintf(stderr, "Error: TRAIT_MODULI value out of range: %s\n", tok.c_str());
+            exit(1);
+        }
+        TRAIT_MODULI[TRAIT_MODULI_COUNT++] = (uint16_t)v;
+        if (comma == string::npos) break;
+        pos = comma + 1;
+    }
+    if (TRAIT_MODULI_COUNT == 0) {
+        fprintf(stderr, "Error: TRAIT_MODULI parsed to zero values\n");
+        exit(1);
+    }
+}
+
+// SHA-256(seed || entity_index_le32 || trait_index_le32)[0] mod TRAIT_MODULI[trait_index]
 static uint8_t derive_trait(const vector<uint8_t>& seed, uint32_t entity_index, uint32_t trait_index) {
+    load_trait_moduli();
     vector<uint8_t> msg(seed.size() + 8);
     memcpy(msg.data(), seed.data(), seed.size());
     // Little-endian u32
@@ -68,7 +121,8 @@ static uint8_t derive_trait(const vector<uint8_t>& seed, uint32_t entity_index, 
     msg[seed.size() + 7] = (uint8_t)(trait_index >> 24);
     uint8_t hash[32];
     sha256(msg.data(), msg.size(), hash);
-    return hash[0];
+    uint16_t mod = (trait_index < TRAIT_MODULI_COUNT) ? TRAIT_MODULI[trait_index] : 256;
+    return (uint8_t)(hash[0] % mod);
 }
 
 // --- Usage ---
@@ -92,6 +146,7 @@ static void usage(const char* prog) {
 static void cmd_keygen() {
     auto t0 = clk::now();
 
+    seed_tfhe_prng();
     auto* params = new_default_gate_bootstrapping_parameters(80);
     auto* sk = new_random_gate_bootstrapping_secret_keyset(params);
 
@@ -268,6 +323,7 @@ static void cmd_batch(const char* seed_hex, uint32_t entity_count, uint32_t trai
     fprintf(stderr, "Generating keys...\n");
     auto t0 = clk::now();
 
+    seed_tfhe_prng();
     auto* params = new_default_gate_bootstrapping_parameters(80);
     auto* sk = new_random_gate_bootstrapping_secret_keyset(params);
 

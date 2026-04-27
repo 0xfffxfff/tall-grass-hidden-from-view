@@ -62,6 +62,7 @@ contract TallGrassTest is Test {
             address(mockEntityMovementVerifier),
             address(mockEncounterVerifier),
             bytes32(0),
+            bytes32(0),
             owner
         );
 
@@ -864,6 +865,7 @@ contract TallGrassTest is Test {
             address(mockMovementVerifier),
             address(mockEntityMovementVerifier),
             address(mockEncounterVerifier),
+            bytes32(0),
             bytes32(0),
             owner
         );

@@ -1,9 +1,29 @@
 // Deterministic trait generation from seed.
 //
-// Each trait value is derived: SHA-256(seed || entity_index_le32 || trait_index_le32)[0].
-// Matches the C++ implementation in keygen.cpp and the Rust implementation in fhe/src/traits.rs.
+// Each trait value: SHA-256(seed || entity_index_le32 || trait_index_le32)[0]
+// reduced modulo TRAIT_MODULI[trait_index]. Matches the C++ implementation
+// in keygen.cpp byte-exact.
+//
+// Moduli are loaded at runtime from the TRAIT_MODULI env var
+// (e.g. "N1,N2,..."). Kept out of source so the schema stays
+// private; commitment is bound on-chain via traitModuliCommitment.
 
 import { createHash } from "crypto";
+
+let cachedModuli: number[] | null = null;
+function getTraitModuli(): number[] {
+  if (cachedModuli) return cachedModuli;
+  const env = process.env.TRAIT_MODULI;
+  if (!env) {
+    throw new Error('TRAIT_MODULI env var required (e.g. "N1,N2,...")');
+  }
+  const parts = env.split(",").map((s) => parseInt(s.trim(), 10));
+  if (parts.length === 0 || parts.some((n) => !Number.isInteger(n) || n < 1 || n > 65535)) {
+    throw new Error("TRAIT_MODULI must be comma-separated positive integers");
+  }
+  cachedModuli = parts;
+  return parts;
+}
 
 /** Write a uint32 as 4 little-endian bytes into buf at offset. */
 function writeU32LE(buf: Buffer, value: number, offset: number): void {
@@ -14,11 +34,11 @@ function writeU32LE(buf: Buffer, value: number, offset: number): void {
 }
 
 /**
- * Derive a single trait value.
+ * Derive a single trait value, reduced to the trait's range.
  * @param seed - Seed bytes (Buffer or Uint8Array)
  * @param entityIndex - Entity index (u32)
- * @param traitIndex - Trait index (u32)
- * @returns Trait value (0-255)
+ * @param traitIndex - Trait index (u32, 0..6)
+ * @returns Trait value in [0, TRAIT_MODULI[traitIndex]).
  */
 export function deriveTrait(
   seed: Buffer | Uint8Array,
@@ -30,7 +50,9 @@ export function deriveTrait(
   writeU32LE(msg, entityIndex, seed.length);
   writeU32LE(msg, traitIndex, seed.length + 4);
   const hash = createHash("sha256").update(msg).digest();
-  return hash[0];
+  const moduli = getTraitModuli();
+  const mod = traitIndex < moduli.length ? moduli[traitIndex] : 256;
+  return hash[0] % mod;
 }
 
 /**

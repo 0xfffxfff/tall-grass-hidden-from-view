@@ -10,12 +10,21 @@ const keygen = join(__dirname, "..", "build-native", "keygen");
 // We'll use the deriveTrait logic inline to avoid build dependency.
 import { createHash } from "crypto";
 
+if (!process.env.TRAIT_MODULI) {
+  console.error('TRAIT_MODULI env var required (e.g. "N1,N2,...").');
+  console.error("Source secrets/env.sh first.");
+  process.exit(1);
+}
+const TRAIT_MODULI = process.env.TRAIT_MODULI.split(",").map((s) => parseInt(s.trim(), 10));
+
 function deriveTrait(seed, entityIndex, traitIndex) {
   const msg = Buffer.alloc(seed.length + 8);
   seed.copy(msg, 0);
   msg.writeUInt32LE(entityIndex, seed.length);
   msg.writeUInt32LE(traitIndex, seed.length + 4);
-  return createHash("sha256").update(msg).digest()[0];
+  const raw = createHash("sha256").update(msg).digest()[0];
+  const mod = traitIndex < TRAIT_MODULI.length ? TRAIT_MODULI[traitIndex] : 256;
+  return raw % mod;
 }
 
 function deriveEntityTraits(seed, entityIndex, traitCount) {

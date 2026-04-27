@@ -36,6 +36,7 @@ contract TallGrassE2ETest is Test {
             address(0),                             // entityMovementVerifier (not tested here)
             address(0),                             // encounterVerifier (not tested here)
             bytes32(0),                             // decryptionKeyCommitment (not tested here)
+            bytes32(0),                             // traitModuliCommitment (not tested here)
             owner
         );
 

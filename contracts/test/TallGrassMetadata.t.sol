@@ -39,6 +39,7 @@ contract TallGrassMetadataTest is Test {
             address(mv),              // entityMovementVerifier
             address(mv),              // encounterVerifier
             bytes32(0),               // decryptionKeyCommitment
+            bytes32(0),               // traitModuliCommitment
             owner
         );
 

@@ -53,6 +53,7 @@ contract Deploy is Script {
             entityMovementVerifier,
             encounterVerifier,
             vm.envBytes32("DECRYPTION_KEY_COMMITMENT"),
+            vm.envBytes32("TRAIT_MODULI_COMMITMENT"),
             deployer
         );
         console.log("TallGrass deployed:", address(tg));

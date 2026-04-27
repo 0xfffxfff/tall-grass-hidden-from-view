@@ -20,6 +20,7 @@ TODO.md
 .thumbs/
 
 # private working materials — kept locally, not in repo
+secrets/
 references/
 context/
 previews/*
