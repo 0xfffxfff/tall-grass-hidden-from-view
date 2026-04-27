@@ -15,6 +15,7 @@ import { useAutoWalk, type WalkPattern } from "@/hooks/useAutoWalk";
 import { useProver } from "@/hooks/useProver";
 import { usePoseidon, poseidonHash } from "@/hooks/usePoseidon";
 import { api, type EncounterData } from "@/api";
+import { APP_CHAIN } from "@/chain";
 import { workBus } from "@/lib/workBus";
 import { WorkStrip } from "./WorkStrip";
 
@@ -352,7 +353,7 @@ export function WalkInline({
   // why-prose for transient/non-disconnected states only — the connect pill
   // already speaks for itself when no wallet is present.
   let whyMessage = "";
-  if (ready === "wrong-chain") whyMessage = "Switch to localhost to walk.";
+  if (ready === "wrong-chain") whyMessage = `Switch to ${APP_CHAIN.name.toLowerCase()} to walk.`;
   else if (!proverReady && ready === "registered") whyMessage = "Loading the prover\u2026";
 
   return (
