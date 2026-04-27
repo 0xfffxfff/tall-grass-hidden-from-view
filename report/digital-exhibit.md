@@ -13,7 +13,7 @@ By 0xfff. Submitted to the Pixel Prize, JUST Open Source Stiftung, 2026.
 | **Title** | Tall Grass (Hidden From View) |
 | **Artist** | 0xfff |
 | **Year** | 2026 |
-| **Network (testnet)** | Sepolia, contract address: [`0xf26D57A329a84493E9bb0541A1A2e22409180d1F`](https://sepolia.etherscan.io/address/0xf26D57A329a84493E9bb0541A1A2e22409180d1F) |
+| **Network (testnet)** | Sepolia, contract address: [`0x72F2b87dB9cF46d19618dAc75EBa656cE747045c`](https://sepolia.etherscan.io/address/0x72F2b87dB9cF46d19618dAc75EBa656cE747045c) |
 | **Frontend (live)** | <https://tallgrass.0xfff.love/> |
 | **Source repository** | <https://github.com/0xfffxfff/tall-grass-hidden-from-view> (GPL-3.0) |
 
