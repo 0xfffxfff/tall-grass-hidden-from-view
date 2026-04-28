@@ -226,21 +226,23 @@ function EncounterRow({
         decoding="async"
       />
       <span className="id">#{pad2(encounter.entityId)}</span>
-      <span className="where">pending</span>
       {isSuccess ? (
-        <span style={{ color: "var(--fg-mid)" }}>minted</span>
+        <span className="where">minted</span>
       ) : (
-        <button
-          className={"aff" + (busy ? " busy" : " live")}
-          onClick={doMint}
-          disabled={busy}
-        >
-          {busy
-            ? isSigning
-              ? "confirm\u2026"
-              : "minting\u2026"
-            : "mint \u00b7 0.2 eth"}
-        </button>
+        <>
+          <span className="where">pending</span>
+          <button
+            className={"aff" + (busy ? " busy" : " live")}
+            onClick={doMint}
+            disabled={busy}
+          >
+            {busy
+              ? isSigning
+                ? "confirm\u2026"
+                : "minting\u2026"
+              : "mint \u00b7 0.2 eth"}
+          </button>
+        </>
       )}
       {error && (
         <span style={{ color: "var(--fg-faint)", fontSize: 11 }}>
