@@ -111,7 +111,13 @@ export function WalkInline({
     address,
     depositBalance,
     onEncounters,
-    onMoved,
+    onMoved: () => {
+      // Each relayed move drains the deposit (gas reimbursement to the
+      // oracle); refetch so the on-screen balance stays honest as the
+      // walk progresses, not just when the user opens top-up/withdraw.
+      refetchBalance();
+      onMoved?.();
+    },
   });
 
   const balanceStr = depositBalance ? formatEther(depositBalance) : "0";
@@ -396,7 +402,7 @@ export function WalkInline({
     !isWalking &&
     (depositBalance ?? 0n) === 0n
   ) {
-    whyMessage = "Top up the auto-walk balance to enable autowalk.";
+    whyMessage = "Top up the relay deposit to enable autowalk.";
   }
 
   return (
@@ -493,7 +499,7 @@ export function WalkInline({
       </div>
 
       <div className="instrument">
-        <span className="instrument-label">auto-walk balance</span>
+        <span className="instrument-label">relay deposit</span>
         <div className="instrument-row">
           <span className="balance">{balanceStr} eth</span>
           <button

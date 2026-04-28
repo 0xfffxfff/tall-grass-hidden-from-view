@@ -29,7 +29,8 @@ export function TitleBar() {
 
   if (wrongChain) {
     return (
-      <p className="titlebar">
+      <p className="titlebar titlebar-warn">
+        <span className="warn-mark">!</span>
         wrong network
         <span className="sep">&middot;</span>
         <button

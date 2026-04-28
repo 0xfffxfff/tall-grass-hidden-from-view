@@ -183,6 +183,40 @@
 }
 p.titlebar, p.titlebar * { text-transform: uppercase; font-size: 12px; }
 .titlebar .sep { padding: 0 8px; }
+
+/* Wrong-chain banner — more prominent than the default pill so accidental
+   mainnet sends can't slip past on a glance. Spans full width at the top
+   of the viewport, brighter foreground, animated mark. */
+.titlebar-warn {
+  left: 24px;
+  right: 24px;
+  top: 24px;
+  padding: 10px 14px;
+  background: rgba(40, 8, 8, 0.92);
+  border-color: var(--fg);
+  color: var(--fg);
+  text-align: center;
+  white-space: normal;
+}
+p.titlebar-warn, p.titlebar-warn * { font-size: 14px; }
+.titlebar-warn .warn-mark {
+  display: inline-block;
+  margin-right: 10px;
+  padding: 0 8px;
+  border: 1px solid var(--fg);
+  font-weight: bold;
+  animation: warn-pulse 1.4s ease-in-out infinite;
+}
+@keyframes warn-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+body[data-state="wrong-chain"] .you,
+body[data-state="wrong-chain"] .walk,
+body[data-state="wrong-chain"] .encounters {
+  opacity: 0.35;
+  pointer-events: none;
+}
 .titlebar .addr { color: var(--fg); }
 .titlebar .aff,
 .titlebar .aff:hover { border-bottom-color: transparent; }
