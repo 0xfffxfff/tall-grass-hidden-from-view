@@ -3,6 +3,7 @@ import { useAccount, useChainId } from "wagmi";
 import { APP_CHAIN } from "@/chain";
 import { useParticipant } from "@/hooks/useParticipant";
 import { useReveals } from "@/hooks/useReveals";
+import { useEncounteredEntities } from "@/hooks/useEncounteredEntities";
 import { projectReveals } from "@/components/monolith/monolithLib";
 import {
   useWatchTallGrassMovedEvent,
@@ -33,6 +34,7 @@ export function App() {
   );
   const [drillId, setDrillId] = useState<number | null>(null);
   const [modalEntityId, setModalEntityId] = useState<number | null>(null);
+  const encountered = useEncounteredEntities(address);
 
   const state: AppState = !isConnected
     ? "disconnected"
@@ -106,15 +108,28 @@ export function App() {
           walkSecret={participant.walkSecret}
           apiToken={participant.apiToken}
           participantMoveCount={participant.participantMoveCount}
-          onEncounters={(es) =>
-            setPendingEncounters((prev) => [...prev, ...es])
-          }
+          onEncounters={(es) => {
+            setPendingEncounters((prev) => [...prev, ...es]);
+            for (const e of es) encountered.mark(e.entityId);
+          }}
           onMoved={participant.refresh}
           onRegistered={participant.refresh}
         />
 
+        <EncountersInline
+          apiToken={participant.apiToken}
+          pendingEncounters={pendingEncounters}
+          onMinted={(entityId) => {
+            setPendingEncounters((prev) =>
+              prev.filter((e) => e.entityId !== entityId),
+            );
+            participant.refresh();
+          }}
+        />
+
         <EntityRegistry
           entityCount={reveals.entityCount}
+          personallyVisible={encountered.ids}
           onSelectEntity={setModalEntityId}
         />
 
@@ -131,17 +146,6 @@ export function App() {
           onEntitySelect={setModalEntityId}
         />
 
-        <EncountersInline
-          apiToken={participant.apiToken}
-          pendingEncounters={pendingEncounters}
-          onMinted={(entityId) => {
-            setPendingEncounters((prev) =>
-              prev.filter((e) => e.entityId !== entityId),
-            );
-            participant.refresh();
-          }}
-        />
-
         <Exhibition />
 
         <Identity />
@@ -154,6 +158,7 @@ export function App() {
         reveals={projection.revealsByPair}
         flatReveals={reveals.reveals}
         prepend={reveals.prepend}
+        personallyVisible={encountered.ids}
         onClose={() => setModalEntityId(null)}
       />
     </>

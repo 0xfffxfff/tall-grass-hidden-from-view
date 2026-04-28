@@ -47,6 +47,10 @@ interface Props {
   reveals: RevealsByPair;
   flatReveals: RevealRecord[];
   prepend: (rec: RevealRecord) => void;
+  // Entity ids the connected wallet has personally encountered. Image
+  // becomes visible in the modal even before the on-chain mint that
+  // would reveal it to everyone else.
+  personallyVisible: Set<number>;
   onClose: () => void;
 }
 
@@ -71,6 +75,7 @@ export function EntityModal({
   reveals,
   flatReveals,
   prepend,
+  personallyVisible,
   onClose,
 }: Props) {
   const open = entityId !== null;
@@ -134,7 +139,9 @@ export function EntityModal({
   const { tokens } = useTokens();
   const token = entityId !== null ? tokens[entityId] : undefined;
   const isArtistProof = entityId === ARTIST_PROOF_ID;
-  const revealed = isArtistProof || !!token?.minted;
+  const personally = entityId !== null && personallyVisible.has(entityId);
+  const revealed = isArtistProof || !!token?.minted || personally;
+  const privateOnly = personally && !token?.minted && !isArtistProof;
 
   // Metadata contract address (one chain read, cached by wagmi). Used as
   // the target for the ciphertext-hash read below.
@@ -155,6 +162,7 @@ export function EntityModal({
 
   const ownerLabel = (() => {
     if (isArtistProof) return ARTIST_PROOF_OWNER_LABEL;
+    if (privateOnly) return "encountered \u00b7 not minted";
     if (!revealed) return "to be revealed";
     if (!token?.owner) return "\u2014";
     return shortAddr(token.owner);

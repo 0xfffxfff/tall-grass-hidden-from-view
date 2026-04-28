@@ -5,6 +5,11 @@ import { pad2, shortAddr } from "./monolithLib";
 
 interface Props {
   entityCount: number;
+  // Entity ids the connected wallet has personally encountered (walked
+  // onto a cell holding them). Ciphertext stays sealed; the JPEG
+  // preview becomes visible in this viewer only — the public mint state
+  // is unchanged.
+  personallyVisible: Set<number>;
   onSelectEntity: (id: number) => void;
 }
 
@@ -16,7 +21,11 @@ const ARTIST_PROOF_OWNER_LABEL = "0xfff.eth";
 
 type Mode = "all" | "mine";
 
-export function EntityRegistry({ entityCount, onSelectEntity }: Props) {
+export function EntityRegistry({
+  entityCount,
+  personallyVisible,
+  onSelectEntity,
+}: Props) {
   const { address, isConnected } = useAccount();
   const { tokens, loading } = useTokens();
   const [mode, setMode] = useState<Mode>("all");
@@ -39,6 +48,7 @@ export function EntityRegistry({ entityCount, onSelectEntity }: Props) {
       owner: string | null;
       mine: boolean;
       revealed: boolean;
+      privateOnly: boolean;
       ownerLabel: string | null;
     }[] = [];
     for (let id = 0; id < entityCount; id++) {
@@ -47,17 +57,21 @@ export function EntityRegistry({ entityCount, onSelectEntity }: Props) {
       const minted = !!t?.minted;
       const mine = !!owner && !!me && owner.toLowerCase() === me;
       const isArtistProof = id === ARTIST_PROOF_ID;
-      const revealed = isArtistProof || minted;
+      const personally = personallyVisible.has(id);
+      const revealed = isArtistProof || minted || personally;
+      const privateOnly = personally && !minted && !isArtistProof;
       const ownerLabel = isArtistProof
         ? ARTIST_PROOF_OWNER_LABEL
         : owner
           ? shortAddr(owner)
-          : null;
+          : privateOnly
+            ? "encountered \u00b7 not minted"
+            : null;
       if (mode === "mine" && !mine) continue;
-      out.push({ id, owner, mine, revealed, ownerLabel });
+      out.push({ id, owner, mine, revealed, privateOnly, ownerLabel });
     }
     return out;
-  }, [tokenById, entityCount, mode, me]);
+  }, [tokenById, entityCount, mode, me, personallyVisible]);
 
   const mintedCount = tokens.filter((t) => t.minted).length;
 
@@ -65,10 +79,12 @@ export function EntityRegistry({ entityCount, onSelectEntity }: Props) {
     <section className="registry">
       <h2>entities</h2>
       <p>
-        Thirty-two entities live in the landscape. Each remains hidden until a
-        visitor encounters and mints it &mdash; only then does its likeness
-        appear here. Entity #00 is the artist&rsquo;s proof, kept by the
-        artist.
+        Thirty-two entities live in the landscape. Each stays hidden in the
+        public registry until a visitor encounters and mints it &mdash; only
+        then does its likeness appear to everyone. Entities you have personally
+        encountered surface in your view as soon as you walk into them, even
+        before you decide to mint. Entity #00 is the artist&rsquo;s proof,
+        kept by the artist.
       </p>
 
       <div className="registry-bar">
@@ -105,7 +121,7 @@ export function EntityRegistry({ entityCount, onSelectEntity }: Props) {
         </p>
       ) : (
         <ul className="registry-grid">
-          {tiles.map(({ id, mine, revealed, ownerLabel }) => {
+          {tiles.map(({ id, mine, revealed, privateOnly, ownerLabel }) => {
             const isArtistProof = id === ARTIST_PROOF_ID;
             return (
               <li
@@ -114,7 +130,8 @@ export function EntityRegistry({ entityCount, onSelectEntity }: Props) {
                   "tile" +
                   (revealed ? " revealed" : " veiled") +
                   (mine ? " mine" : "") +
-                  (isArtistProof ? " artist-proof" : "")
+                  (isArtistProof ? " artist-proof" : "") +
+                  (privateOnly ? " private" : "")
                 }
               >
                 <button

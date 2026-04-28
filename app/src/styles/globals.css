@@ -613,6 +613,7 @@ body[data-state="registered"] .you {
 }
 .tile.veiled .tile-image { outline: 1px solid var(--fg-ghost); outline-offset: -1px; }
 .tile.revealed .tile-image { outline: 1px solid var(--fg-faint); outline-offset: -1px; }
+.tile.private .tile-image { outline-style: dashed; }
 .tile.mine .tile-image { outline-color: var(--fg); }
 .tile-button:hover .tile-image { outline-color: var(--fg-mid); }
 .tile.mine .tile-button:hover .tile-image { outline-color: var(--fg); }
@@ -905,13 +906,20 @@ body[data-state="registered"] .encounters { display: block; }
 }
 .encounters .enc-list li {
   display: grid;
-  grid-template-columns: 4em 6em 6em 1fr;
+  grid-template-columns: 4em 36px 6em 6em 1fr;
   column-gap: 14px;
-  align-items: baseline;
+  align-items: center;
 }
 .encounters .enc-list .ts { color: var(--fg-dim); }
 .encounters .enc-list .id { color: var(--fg); }
 .encounters .enc-list .where { color: var(--fg-mid); }
+.encounters .enc-list .encounter-preview {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  outline: 1px dashed var(--fg-faint);
+  outline-offset: -1px;
+}
 
 /* ------------------------------------------------------------------ */
 /*  IDENTITY STRIP                                                    */

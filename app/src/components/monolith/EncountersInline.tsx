@@ -202,6 +202,13 @@ function EncounterRow({
   return (
     <li>
       <span className="ts">{fmtTime(encounter.ts)}</span>
+      <img
+        className="encounter-preview"
+        src={`/previews/${encounter.entityId}.jpg`}
+        alt={`Entity #${pad2(encounter.entityId)}`}
+        loading="lazy"
+        decoding="async"
+      />
       <span className="id">#{pad2(encounter.entityId)}</span>
       <span className="where">pending</span>
       {isSuccess ? (

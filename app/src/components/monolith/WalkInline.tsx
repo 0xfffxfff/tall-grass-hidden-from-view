@@ -338,7 +338,11 @@ export function WalkInline({
 
   const isWalking = autoWalk.running;
   const canRelease =
-    ready === "registered" && !!walkSecret && proverReady && !isWalking;
+    ready === "registered" &&
+    !!walkSecret &&
+    proverReady &&
+    !isWalking &&
+    (depositBalance ?? 0n) > 0n;
   const canStop = ready === "registered" && isWalking;
   const canSteer =
     ready === "registered" && proverReady && !isMoveSigning && !isMoveConfirming;
@@ -355,6 +359,13 @@ export function WalkInline({
   let whyMessage = "";
   if (ready === "wrong-chain") whyMessage = `Switch to ${APP_CHAIN.name.toLowerCase()} to walk.`;
   else if (!proverReady && ready === "registered") whyMessage = "Loading the prover\u2026";
+  else if (
+    ready === "registered" &&
+    !isWalking &&
+    (depositBalance ?? 0n) === 0n
+  ) {
+    whyMessage = "Top up the auto-walk balance to enable autowalk.";
+  }
 
   return (
     <section className="walk">
