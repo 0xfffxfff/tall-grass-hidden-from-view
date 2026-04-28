@@ -951,8 +951,6 @@ body[data-state="registered"] .encounters { display: block; }
   width: 36px;
   height: 36px;
   object-fit: cover;
-  outline: 1px dashed var(--fg-faint);
-  outline-offset: -1px;
 }
 
 /* ------------------------------------------------------------------ */
