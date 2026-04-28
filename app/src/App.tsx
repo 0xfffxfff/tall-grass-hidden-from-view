@@ -119,10 +119,7 @@ export function App() {
         <EncountersInline
           apiToken={participant.apiToken}
           pendingEncounters={pendingEncounters}
-          onMinted={(entityId) => {
-            setPendingEncounters((prev) =>
-              prev.filter((e) => e.entityId !== entityId),
-            );
+          onMinted={() => {
             participant.refresh();
           }}
         />
