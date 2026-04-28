@@ -246,6 +246,17 @@ function deriveSalt(walkSecret: bigint, moveIndex: number): bigint {
   return poseidonHash([walkSecret, BigInt(moveIndex)]);
 }
 
+// Spawn coordinates are derived deterministically from walkSecret so the
+// oracle can recompute them on restart. The 3-input form is domain-separated
+// from deriveSalt's 2-input form, so the spawn hash can never collide with
+// any move-N salt for the same wallet.
+function deriveSpawn(walkSecret: bigint): { x: number; y: number } {
+  const h = poseidonHash([walkSecret, 0n, 0n]);
+  const x = Number(h % BigInt(config.GRID_WIDTH));
+  const y = Number((h / BigInt(config.GRID_WIDTH)) % BigInt(config.GRID_HEIGHT));
+  return { x, y };
+}
+
 function deriveBlindingSeed(entityId: number): bigint {
   return poseidonHash([seed, BigInt(entityId)]);
 }
@@ -427,11 +438,12 @@ async function recoverFromChain(contract: Contract): Promise<void> {
 
     // 3. Replay each move: brute-force 4 directions per step
     const walkSecret = deriveWalkSecret(address);
+    const spawn = deriveSpawn(walkSecret);
     const parsed = sorted.map((e) => ({
       newCommitment: BigInt((e as unknown as { args: { newCommitment: string } }).args.newCommitment),
     }));
     const result = replayPositionMoves(
-      Math.floor(config.GRID_WIDTH / 2), Math.floor(config.GRID_HEIGHT / 2),
+      spawn.x, spawn.y,
       parsed, (i) => deriveSalt(walkSecret, i),
     );
 
@@ -468,9 +480,8 @@ function subscribeToEvents(contract: Contract): void {
   contract.on("Registered", (participantAddr: string) => {
     const key = participantAddr.toLowerCase();
     if (participants.has(key)) return;
-    const x = Math.floor(config.GRID_WIDTH / 2);
-    const y = Math.floor(config.GRID_HEIGHT / 2);
     const walkSecret = deriveWalkSecret(participantAddr);
+    const { x, y } = deriveSpawn(walkSecret);
     const salt = deriveSalt(walkSecret, 0);
     participants.set(key, { x, y, salt, moveCount: 0, walkSecret });
     console.log(`  [event] Registered ${key.slice(0, 8)}...`);
@@ -754,9 +765,8 @@ async function handleRegister(body: string): Promise<ApiResponse> {
     }
   }
 
-  const x = Math.floor(config.GRID_WIDTH / 2);
-  const y = Math.floor(config.GRID_HEIGHT / 2);
   const walkSecret = deriveWalkSecret(address);
+  const { x, y } = deriveSpawn(walkSecret);
   const salt = deriveSalt(walkSecret, 0);
   const commitment = poseidonHash([BigInt(x), BigInt(y), salt]);
   const commitmentBytes32 = toBytes32(commitment);
