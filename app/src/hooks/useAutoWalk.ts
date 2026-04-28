@@ -251,9 +251,20 @@ export function useAutoWalk(inputs: AutoWalkInputs) {
 
           setStatus("confirming...");
           workBus.update(WORK_ID, "waiting for chain confirmation");
-          await publicClient.waitForTransactionReceipt({
+          const receipt = await publicClient.waitForTransactionReceipt({
             hash: relayResult.txHash as Hex,
           });
+          // The relay can revert on chain (verifier returned false, gas
+          // reimbursement failure, etc). Treating a reverted tx as success
+          // would advance our local cx/cy past a move that never landed,
+          // and every subsequent proof would verify against a chain
+          // commitment that never existed — a cascading failure across the
+          // rest of the walk. Pause and surface the revert instead.
+          if (receipt.status !== "success") {
+            throw new Error(
+              `relay tx reverted on chain (${relayResult.txHash.slice(0, 10)})`,
+            );
+          }
 
           // Update internal tracking
           cx = newX;

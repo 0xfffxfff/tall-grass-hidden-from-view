@@ -827,24 +827,47 @@ async function handleRelay(body: string): Promise<ApiResponse> {
     return { status: 400, body: { error: "Cannot decode new position from commitment" } };
   }
 
-  // Submit relay tx — return hash immediately, update state on confirmation
+  // Submit relay tx, then optimistically advance in-memory state. Returning
+  // before tx confirmation used to leave the oracle a poll-cycle behind on
+  // its own moves (POLL_INTERVAL_MS = 12.5s); SPA's next /api/relay would
+  // arrive within ~500ms with a commitment based on already-advanced state,
+  // and brute-force against stale (x, y, moveCount) would 400.
+  //
+  // Optimistic safety: the brute-force decode above already proved the
+  // commitment is reachable from current state via one of the four cardinal
+  // moves, and the proof has been verified client-side. The relay tx can
+  // still revert (network failure, gas spike, oracle's own balance issue);
+  // if it does, we roll back to the snapshot below.
   try {
-    const moveCountBefore = participant.moveCount;
+    const snapshotX = participant.x;
+    const snapshotY = participant.y;
+    const snapshotSalt = participant.salt;
+    const snapshotMoveCount = participant.moveCount;
     const tx = await contract.relayMove(address, proof, newCommitment, { gasLimit: 3_000_000 }) as { hash: string; wait: () => Promise<{ status: number }> };
 
-    // Background: watch tx and update local state on confirmation
+    // Optimistic advance — synchronous, before returning.
+    moveCounter++;
+    participant.moveCount = snapshotMoveCount + 1;
+    participant.x = newX;
+    participant.y = newY;
+    participant.salt = newSalt;
+
+    // Background: watch tx; roll back if it reverted. On success the event
+    // listener may try to re-apply the same move; its `participant.moveCount
+    // >= chainMC` guard absorbs that no-op.
     tx.wait().then((receipt) => {
       if (receipt.status !== 1) {
-        console.error(`  Relay tx reverted for ${key.slice(0, 8)}... tx=${tx.hash.slice(0, 10)}`);
+        console.error(`  Relay tx reverted for ${key.slice(0, 8)}... tx=${tx.hash.slice(0, 10)} — rolling back`);
+        // Only roll back if no further moves landed in the meantime.
+        if (participant.moveCount === snapshotMoveCount + 1) {
+          moveCounter--;
+          participant.x = snapshotX;
+          participant.y = snapshotY;
+          participant.salt = snapshotSalt;
+          participant.moveCount = snapshotMoveCount;
+        }
         return;
       }
-      // Guard: only update if the event listener hasn't already advanced us
-      if (participant.moveCount !== moveCountBefore) return;
-      moveCounter++;
-      participant.moveCount++;
-      participant.x = newX;
-      participant.y = newY;
-      participant.salt = newSalt;
       console.log(`  Confirmed move for ${key.slice(0, 8)}... -> (${newX},${newY}) tx=${tx.hash.slice(0, 10)}`);
     }).catch((e: Error) => {
       console.error(`  Relay tx watch failed for ${key.slice(0, 8)}...:`, e.message);
