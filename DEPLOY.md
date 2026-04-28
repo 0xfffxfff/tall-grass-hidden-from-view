@@ -128,7 +128,41 @@ collection card):
 npx hardhat set-image --file ../previews/onchain/1x1/0.jpg --network sepolia
 ```
 
-## 8. Build & deploy the SPA
+## 8. Sync FHE data + restart the oracle
+
+The oracle backend (`hiddenfromview.0xfff.love`) loads `manifest.json`,
+the FHE keys, and the merkle tree from disk at boot. `app/data/` is
+gitignored, so `git pull` on the server does NOT refresh it. After every
+fresh seed, sync from the laptop and restart the systemd unit:
+
+```
+rsync -avz --delete --progress app/data/ \
+  tallgrass@hiddenfromview.0xfff.love:/home/tallgrass/tall-grass-hidden-from-view/app/data/
+
+ssh tallgrass@hiddenfromview.0xfff.love 'sudo systemctl restart tall-grass'
+```
+
+`--delete` is load-bearing: it removes any stale files on the server that
+no longer exist in the new batch (orphan `entities/<id>.bin` from a prior
+run, an old `manifest.json` from a prior seed). Without it, the server
+will keep serving stale ciphertexts or produce encounter proofs against a
+mismatched seed — which the new on-chain `seedCommitment` will reject,
+and `mint` calls will revert at the verifier with `eth_estimateGas`
+falling back to the block gas limit (visible to the user as a wallet-side
+"gas limit too high" error).
+
+Confirm on the server:
+
+```
+ssh tallgrass@hiddenfromview.0xfff.love \
+  'sudo journalctl -u tall-grass -n 50 --no-pager' \
+  | grep -iE "manifest|merkle|seed|init"
+```
+
+Should show fresh init lines reflecting the current entity count, trait
+count, and merkle root.
+
+## 9. Build & deploy the SPA
 
 ```
 cd ../app
@@ -144,7 +178,7 @@ Deploy `app/dist/` to Netlify with whatever flow you use
 (`netlify deploy --prod --dir=dist` from the CLI, or push-to-deploy if
 configured).
 
-## 9. Smoke tests
+## 10. Smoke tests
 
 Confirm the data allowlist (proxied through Netlify to the oracle backend):
 
