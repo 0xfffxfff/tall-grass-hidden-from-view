@@ -18,6 +18,8 @@ Three movements:
 Read the work: [`report/digital-exhibit.md`](report/digital-exhibit.md) ·
 [`report/tech-spec.md`](report/tech-spec.md).
 
+Reproduce the deployment: [`DEPLOY.md`](DEPLOY.md).
+
 Funded by The Pixel Prize / JUST Open Source Stiftung. Released under GPL-3.0;
 `fhe-wasm/` is Apache-2.0 (TFHE port).
 
