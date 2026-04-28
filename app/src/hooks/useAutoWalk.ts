@@ -4,6 +4,8 @@ import { usePublicClient } from "wagmi";
 import { poseidonHash, type PoseidonHasher } from "@/hooks/usePoseidon";
 import { api, type EncounterData } from "@/api";
 import { workBus } from "@/lib/workBus";
+import { APP_CHAIN } from "@/chain";
+import { tallGrassAddress } from "@/generated";
 
 const WORK_ID = "auto-walk";
 
@@ -131,6 +133,41 @@ export function useAutoWalk(inputs: AutoWalkInputs) {
       runningRef.current = false;
     };
   }, []);
+
+  // Per-address localStorage persistence so the move log survives a page
+  // refresh. Hydrate the first time we see an address, then mirror future
+  // history changes back to storage. The ref gate prevents the empty initial
+  // state from clobbering saved data before the hydrate completes.
+  const hydratedAddressRef = useRef<string | null>(null);
+  const { address } = inputs;
+  useEffect(() => {
+    if (!address) {
+      if (hydratedAddressRef.current) {
+        setHistory([]);
+        hydratedAddressRef.current = null;
+      }
+      return;
+    }
+    const contract =
+      tallGrassAddress[APP_CHAIN.id as keyof typeof tallGrassAddress];
+    const key = `tg:walk-history:${APP_CHAIN.id}:${contract.toLowerCase()}:${address.toLowerCase()}`;
+    if (hydratedAddressRef.current !== address) {
+      try {
+        const raw = localStorage.getItem(key);
+        const parsed = raw ? JSON.parse(raw) : null;
+        setHistory(Array.isArray(parsed) ? parsed.slice(0, 50) : []);
+      } catch {
+        setHistory([]);
+      }
+      hydratedAddressRef.current = address;
+      return;
+    }
+    try {
+      localStorage.setItem(key, JSON.stringify(history));
+    } catch {
+      // Storage full or disabled; the in-memory history still works.
+    }
+  }, [address, history]);
 
   const addStep = useCallback(
     (step: number, direction: number, encounter: boolean) => {
