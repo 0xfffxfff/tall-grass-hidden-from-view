@@ -1,11 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import { useAccount, useWaitForTransactionReceipt } from "wagmi";
+import {
+  useAccount,
+  useChainId,
+  useSwitchChain,
+  useWaitForTransactionReceipt,
+} from "wagmi";
 import { type Hex, parseEther } from "viem";
 import {
   useReadTallGrassMintPrice,
   useWriteTallGrassMint,
 } from "@/generated";
 import { api, type EncounterData } from "@/api";
+import { APP_CHAIN } from "@/chain";
 import { fmtTime, pad2 } from "./monolithLib";
 import { workBus } from "@/lib/workBus";
 import { WorkStrip } from "./WorkStrip";
@@ -145,6 +151,8 @@ function EncounterRow({
   onMinted: () => void;
 }) {
   const { data: mintPrice } = useReadTallGrassMintPrice();
+  const walletChainId = useChainId();
+  const { switchChainAsync } = useSwitchChain();
   const {
     writeContract: mint,
     data: txHash,
@@ -180,12 +188,20 @@ function EncounterRow({
   const busy = isSigning || isConfirming;
   const error = mintError || txError;
 
-  function doMint() {
+  async function doMint() {
     workBus.start({
       id: `mint-${encounter.entityId}`,
       scope: "walk",
       label: `confirm mint of #${pad2(encounter.entityId)} in wallet`,
     });
+    if (walletChainId !== APP_CHAIN.id) {
+      try {
+        await switchChainAsync({ chainId: APP_CHAIN.id });
+      } catch {
+        workBus.end(`mint-${encounter.entityId}`);
+        return;
+      }
+    }
     mint({
       args: [
         BigInt(encounter.entityId),

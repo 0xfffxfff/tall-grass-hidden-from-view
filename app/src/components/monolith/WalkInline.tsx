@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import {
   useAccount,
+  useChainId,
+  useSwitchChain,
   useWaitForTransactionReceipt,
 } from "wagmi";
 import { type Hex, formatEther, parseEther } from "viem";
@@ -63,8 +65,27 @@ export function WalkInline({
   onRegistered,
 }: Props) {
   const { address } = useAccount();
+  const walletChainId = useChainId();
+  const { switchChainAsync } = useSwitchChain();
   const poseidon = usePoseidon();
   const { ready: proverReady, prove } = useProver();
+
+  // Belt-and-suspenders: every write hook below issues txs to whichever
+  // chain the wallet is currently on. The button gates already require
+  // ready === "registered" (which is false on wrong-chain), but a wallet
+  // can switch chains between modal-open and confirm-click. Refusing to
+  // call writeContract from a wrong-chain wallet — and prompting a switch
+  // first — closes that gap and stops accidental mainnet sends.
+  async function ensureRightChain(): Promise<boolean> {
+    if (walletChainId === APP_CHAIN.id) return true;
+    try {
+      await switchChainAsync({ chainId: APP_CHAIN.id });
+      return true;
+    } catch {
+      setStatus(`switch wallet to ${APP_CHAIN.name.toLowerCase()} first`);
+      return false;
+    }
+  }
   const [showTopup, setShowTopup] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [topupAmount, setTopupAmount] = useState("0.01");
@@ -187,6 +208,10 @@ export function WalkInline({
       });
       setStatus("confirm in wallet\u2026");
       workBus.update(wid, "confirm in wallet");
+      if (!(await ensureRightChain())) {
+        workBus.end(wid);
+        return;
+      }
       submitMove({ args: [proof as Hex, toBytes32(newCommitment) as Hex] });
     } catch (e) {
       setStatus(e instanceof Error ? e.message : "steer failed");
@@ -224,9 +249,11 @@ export function WalkInline({
     }
   }, [isDepositPending, isDepositConfirming, depositConfirmed, refetchBalance]);
 
-  function submitTopup() {
+  async function submitTopup() {
     try {
-      deposit({ value: parseEther(topupAmount) });
+      const value = parseEther(topupAmount);
+      if (!(await ensureRightChain())) return;
+      deposit({ value });
     } catch {
       setStatus("invalid amount");
     }
@@ -260,7 +287,7 @@ export function WalkInline({
     }
   }, [isWithdrawPending, isWithdrawConfirming, withdrawConfirmed, refetchBalance]);
 
-  function submitWithdraw() {
+  async function submitWithdraw() {
     try {
       const amount = withdrawAmount.trim() === ""
         ? (depositBalance ?? 0n)
@@ -269,6 +296,7 @@ export function WalkInline({
         setStatus("nothing to withdraw");
         return;
       }
+      if (!(await ensureRightChain())) return;
       withdraw({ args: [amount] });
     } catch {
       setStatus("invalid amount");
@@ -315,6 +343,10 @@ export function WalkInline({
       );
       setStatus("confirm in wallet\u2026");
       workBus.update("register", "confirm registration in wallet");
+      if (!(await ensureRightChain())) {
+        workBus.end("register");
+        return;
+      }
       register({ args: [result.commitment as Hex, result.signature as Hex] });
     } catch (e) {
       setStatus(e instanceof Error ? e.message : "registration failed");
