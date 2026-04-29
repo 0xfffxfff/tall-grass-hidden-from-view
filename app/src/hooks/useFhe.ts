@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { fheWorker, setLogHandler } from "@/fheWorkerClient";
 import { workBus } from "@/lib/workBus";
 
@@ -37,11 +37,38 @@ function persistConsent(): void {
   try { localStorage.setItem(CONSENT_KEY, "1"); } catch {}
 }
 
+// Consent state is module-level so any useFhe consumer renders the prompt,
+// not just the one that initiated bootstrap. Without this, opening the
+// entity modal and clicking a cell would silently wait on the bootstrap
+// the heatmap had already started, with no visible confirmation surface
+// inside the modal.
+let consentResolver: ((ok: boolean) => void) | null = null;
+let awaitingConsentGlobal = false;
+const consentSubscribers = new Set<() => void>();
+function emitConsentChange(): void {
+  for (const cb of consentSubscribers) cb();
+}
+function setAwaitingConsentGlobal(v: boolean): void {
+  if (awaitingConsentGlobal === v) return;
+  awaitingConsentGlobal = v;
+  emitConsentChange();
+}
+function subscribeConsent(cb: () => void): () => void {
+  consentSubscribers.add(cb);
+  return () => { consentSubscribers.delete(cb); };
+}
+function getAwaitingConsent(): boolean {
+  return awaitingConsentGlobal;
+}
+
 export function useFhe(): UseFheResult {
   const [status, setStatus] = useState<FheStatus>("idle");
   const [message, setMessage] = useState("");
-  const [awaitingConsent, setAwaitingConsent] = useState(false);
-  const consentResolverRef = useRef<((ok: boolean) => void) | null>(null);
+  const awaitingConsent = useSyncExternalStore(
+    subscribeConsent,
+    getAwaitingConsent,
+    () => false,
+  );
 
   useEffect(() => {
     setLogHandler((m) => {
@@ -54,15 +81,15 @@ export function useFhe(): UseFheResult {
 
   const grantConsent = useCallback(() => {
     persistConsent();
-    consentResolverRef.current?.(true);
-    consentResolverRef.current = null;
-    setAwaitingConsent(false);
+    consentResolver?.(true);
+    consentResolver = null;
+    setAwaitingConsentGlobal(false);
   }, []);
 
   const cancelConsent = useCallback(() => {
-    consentResolverRef.current?.(false);
-    consentResolverRef.current = null;
-    setAwaitingConsent(false);
+    consentResolver?.(false);
+    consentResolver = null;
+    setAwaitingConsentGlobal(false);
   }, []);
 
   const ensureReady = useCallback(async () => {
@@ -87,9 +114,9 @@ export function useFhe(): UseFheResult {
         // Pause the strip while the consent UI is what the user reads —
         // we don't want a duplicate "downloading…" message racing it.
         workBus.update("fhe-bootstrap", "waiting for confirmation");
-        setAwaitingConsent(true);
+        setAwaitingConsentGlobal(true);
         const ok = await new Promise<boolean>((resolve) => {
-          consentResolverRef.current = resolve;
+          consentResolver = resolve;
         });
         if (!ok) throw new Error("Cloud key download declined");
       }
