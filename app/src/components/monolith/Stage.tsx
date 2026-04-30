@@ -30,6 +30,12 @@ uniform float uZoom;
 // haze drifts past. The entity loops its kinematic signature on a
 // per-entity period derived from cipher byte 14.
 uniform float uEntityLock;
+// Static world-space camera shift (world units). Used by the back-to-back
+// gallery setup so the second screen can show a different region of the
+// same field. Applied to worldUv after the locked-mode camera follow, so
+// haze, sweep, encounters, and comparisons all shift coherently. The
+// vignette/column passes use vUv (screen space) and stay centred.
+uniform vec2 uOffset;
 
 float ciphByte(float entityId, float idx) {
   return fract(sin(dot(vec2(entityId * 7.131 + idx, 13.0),
@@ -348,7 +354,7 @@ void main() {
   // camera follow shift. In Monolith mode cameraPos is zero so worldUv
   // == uv (no change). In locked mode, the locked entity ends up at
   // screen center because its own world position equals cameraPos.
-  vec2 worldUv = uv + cameraPos;
+  vec2 worldUv = uv + cameraPos + uOffset;
 
   // Run the field at world coords — same encounters, comparisons, and
   // sweep. Other slabs appear at their world positions relative to the
@@ -488,9 +494,21 @@ interface StageProps {
   // the haze drifts past. Used for the per-entity NFT depiction.
   // Undefined or out of range → Monolith mode.
   entityId?: number;
+  // CSS-pixel camera shift for back-to-back gallery screens. Converted to
+  // world units at draw time using current dpr/zoom: 1080 CSS px on a
+  // dpr=1, zoom=1.4 screen ≈ exactly one screen-width of shift.
+  offsetX?: number;
+  offsetY?: number;
 }
 
-export function Stage({ children, className, zoom = 1.0, entityId }: StageProps) {
+export function Stage({
+  children,
+  className,
+  zoom = 1.0,
+  entityId,
+  offsetX = 0,
+  offsetY = 0,
+}: StageProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const zoomRef = useRef(zoom);
@@ -503,6 +521,10 @@ export function Stage({ children, className, zoom = 1.0, entityId }: StageProps)
   );
   entityLockRef.current =
     entityId !== undefined && entityId >= 0 && entityId <= 31 ? entityId : -1;
+  const offsetXRef = useRef(offsetX);
+  offsetXRef.current = offsetX;
+  const offsetYRef = useRef(offsetY);
+  offsetYRef.current = offsetY;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -649,6 +671,18 @@ export function Stage({ children, className, zoom = 1.0, entityId }: StageProps)
       gl!.uniform1f(gl!.getUniformLocation(progNoise, "uRot"), 0.0);
       gl!.uniform1f(gl!.getUniformLocation(progNoise, "uZoom"), zoomRef.current);
       gl!.uniform1f(gl!.getUniformLocation(progNoise, "uEntityLock"), entityLockRef.current);
+      // CSS px → world units. From `uv = (vUv - 0.5) * uRes / 520 / zoom`
+      // and texW = canvas.width / 3, canvas.width = cssWidth * dpr, this
+      // works out to dpr / (1560 * zoom) world units per CSS pixel. At
+      // dpr=1 zoom=1.4, 1080 CSS px ≈ 0.495 world units, which equals
+      // exactly one viewport-width of shift on a 1080px-wide screen.
+      const dprNow = Math.min(window.devicePixelRatio || 1, 2);
+      const pxToWorld = dprNow / (1560 * Math.max(zoomRef.current, 0.01));
+      gl!.uniform2f(
+        gl!.getUniformLocation(progNoise, "uOffset"),
+        offsetXRef.current * pxToWorld,
+        offsetYRef.current * pxToWorld,
+      );
       gl!.drawArrays(gl!.TRIANGLES, 0, 3);
 
       gl!.bindFramebuffer(gl!.FRAMEBUFFER, null);

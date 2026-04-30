@@ -277,6 +277,12 @@ body.full-mode {
 }
 body.full-mode .ticker { display: none; }
 
+/* mirror-mode (route: /full?mirror=1). For the second of two back-to-back
+   gallery screens — flips the canvas left-to-right so a slab moving east
+   in world space reads as moving east on both screens regardless of which
+   side you walk to. Combine with offsetX/offsetY to shift the camera. */
+body.mirror-mode .stage canvas { transform: scaleX(-1); }
+
 /* ------------------------------------------------------------------ */
 /*  YOU STRIP — connected-only summary below canvas                   */
 /* ------------------------------------------------------------------ */

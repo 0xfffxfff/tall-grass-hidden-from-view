@@ -35,11 +35,38 @@ function readZoomOverride(): number | undefined {
   if (!Number.isFinite(parsed) || parsed < 0.3 || parsed > 3.0) return undefined;
   return parsed;
 }
+// /full?mirror=1 flips the canvas horizontally for the second of two
+// back-to-back gallery screens. Combine with offsetX/offsetY (CSS px) to
+// shift the camera so the two screens cover different regions of the world.
+function readMirror(): boolean {
+  if (!isFull) return false;
+  return new URLSearchParams(window.location.search).get("mirror") === "1";
+}
+function readOffset(key: "offsetX" | "offsetY"): number {
+  if (!isFull) return 0;
+  const v = new URLSearchParams(window.location.search).get(key);
+  if (v === null) return 0;
+  const parsed = Number.parseFloat(v);
+  if (!Number.isFinite(parsed)) return 0;
+  return parsed;
+}
 const lockedEntityId = readLockedEntityId();
 const zoomOverride = readZoomOverride();
+const mirror = readMirror();
+const offsetX = readOffset("offsetX");
+const offsetY = readOffset("offsetY");
 
 function Root() {
-  if (isFull) return <FullPage entityId={lockedEntityId} zoom={zoomOverride} />;
+  if (isFull)
+    return (
+      <FullPage
+        entityId={lockedEntityId}
+        zoom={zoomOverride}
+        mirror={mirror}
+        offsetX={offsetX}
+        offsetY={offsetY}
+      />
+    );
   if (reportSlug) return <Report slug={reportSlug} />;
   return <App />;
 }

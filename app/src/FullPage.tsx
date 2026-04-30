@@ -17,15 +17,38 @@ import { Stage } from "@/components/monolith/Stage";
 interface FullPageProps {
   entityId?: number;
   zoom?: number;
+  // ?mirror=1: scaleX(-1) on the canvas for the second of two back-to-back
+  // gallery screens, so world directions read consistently as you walk
+  // around the sculpture. offsetX/offsetY are CSS pixels of camera shift,
+  // converted to world units in Stage using the current dpr/zoom.
+  mirror?: boolean;
+  offsetX?: number;
+  offsetY?: number;
 }
 
-export function FullPage({ entityId, zoom = 1.4 }: FullPageProps) {
+export function FullPage({
+  entityId,
+  zoom = 1.4,
+  mirror = false,
+  offsetX = 0,
+  offsetY = 0,
+}: FullPageProps) {
   useEffect(() => {
     document.body.classList.add("full-mode");
+    if (mirror) document.body.classList.add("mirror-mode");
     return () => {
       document.body.classList.remove("full-mode");
+      document.body.classList.remove("mirror-mode");
     };
-  }, []);
+  }, [mirror]);
 
-  return <Stage className="stage-full" zoom={zoom} entityId={entityId} />;
+  return (
+    <Stage
+      className="stage-full"
+      zoom={zoom}
+      entityId={entityId}
+      offsetX={offsetX}
+      offsetY={offsetY}
+    />
+  );
 }
