@@ -50,11 +50,21 @@ function readOffset(key: "offsetX" | "offsetY"): number {
   if (!Number.isFinite(parsed)) return 0;
   return parsed;
 }
+// /full?reactive=1 enables the chain reactivity overlay (default off so
+// the kiosk remains aesthetically identical to the pre-reactive build).
+// /full?reactive=1&verbose=1 also logs synthetic-loop slot transitions
+// and every reactive event.
+function readFlag(key: string): boolean {
+  if (!isFull) return false;
+  return new URLSearchParams(window.location.search).get(key) === "1";
+}
 const lockedEntityId = readLockedEntityId();
 const zoomOverride = readZoomOverride();
 const mirror = readMirror();
 const offsetX = readOffset("offsetX");
 const offsetY = readOffset("offsetY");
+const reactive = readFlag("reactive");
+const verbose = readFlag("verbose");
 
 function Root() {
   if (isFull)
@@ -65,6 +75,8 @@ function Root() {
         mirror={mirror}
         offsetX={offsetX}
         offsetY={offsetY}
+        reactive={reactive}
+        verbose={verbose}
       />
     );
   if (reportSlug) return <Report slug={reportSlug} />;
