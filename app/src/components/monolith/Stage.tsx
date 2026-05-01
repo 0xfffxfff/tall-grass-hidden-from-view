@@ -338,14 +338,22 @@ float chainEntity(vec2 uv, float entityId, float t, float mintedTime, float puls
     pos.y = mix(-1.10 * dir, 1.10 * dir, u);
   }
 
-  // Pulse: brief brightness/scale boost after EntityMoved. Duration is
-  // in shader-time; 0.18 shader-seconds == 3 wall-clock seconds at the
-  // SPEED=0.06 advance rate.
+  // Pulse: asymmetric "breath" on alpha after EntityMoved. Easing-out
+  // rise to peak in 2 wall-seconds, then a long, very gentle decay over
+  // 11 wall-seconds back to baseline. Durations in shader-time:
+  // 0.12 == 2 wall-sec, 0.78 == 13 wall-sec, both at SPEED=0.06.
   float pulseAge = t - pulseTime;
-  float pulse = (pulseTime >= 0.0 && pulseAge >= 0.0 && pulseAge < 0.18)
-              ? (1.0 - pulseAge / 0.18) * (1.0 - pulseAge / 0.18)
-              : 0.0;
-  size *= 1.0 + pulse * 0.25;
+  float pulse;
+  if (pulseTime < 0.0 || pulseAge < 0.0 || pulseAge > 0.78) {
+    pulse = 0.0;
+  } else if (pulseAge < 0.12) {
+    // Rise: smoothstep ease-out into the peak.
+    pulse = smoothstep(0.0, 0.12, pulseAge);
+  } else {
+    // Fall: long, gentle smoothstep down. ~5.5x slower than the rise so
+    // the slab lingers and trails back rather than snapping.
+    pulse = 1.0 - smoothstep(0.12, 0.78, pulseAge);
+  }
 
   float ang = (ciphByte(entityId, 12.0) - 0.5) * 6.2832 * uRot;
   float c = cos(ang);
@@ -354,14 +362,17 @@ float chainEntity(vec2 uv, float entityId, float t, float mintedTime, float puls
   q = vec2(c * q.x - s * q.y, s * q.x + c * q.y);
   float d = sdBox(q, size);
 
-  // Persistent visibility: held at near-full, with a soft edge that
-  // tightens during pulses.
-  float depth = mix(0.30, 0.10, pulse);
+  // Persistent visibility: a soft, steady edge. Pulse no longer changes
+  // the edge or size — only the alpha breathes.
+  float depth = 0.30;
   float edge = 0.012 + depth * 0.45;
   float mask = 1.0 - smoothstep(-edge, edge, d);
 
-  // Slight overall alpha lift on pulse so it reads as a flash.
-  float alpha = (0.85 + pulse * 0.40) * fadeIn;
+  // Alpha breathes from the steady 0.85 baseline up toward fully solid
+  // (and beyond into "more black" territory — the downstream ink curve
+  // saturates, mapping high alpha to deep black) at the bell's peak,
+  // then back. fadeIn gates everything during the post-mint ramp.
+  float alpha = (0.85 + pulse * 1.50) * fadeIn;
   return mask * alpha;
 }
 
