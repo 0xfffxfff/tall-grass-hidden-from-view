@@ -33,18 +33,13 @@ import { api, type RevealRecord } from "@/api";
 // NFT depiction — same shader code path, same atmospheric finish; what
 // changes is that the field is reduced to one signature.
 //
-// The chain reactivity overlay is always on: live Moved / Minted /
-// EntityMoved contract events and oracle reveals are pushed into
+// Live Moved / Minted / EntityMoved events and oracle reveals push into
 // reactiveQueue as additive layers over the synthetic field. RPC failures
-// degrade gracefully (boot replay retries once after 30s, live watchers
+// degrade silently: boot replay retries once after 30s, live watchers
 // rotate across fallback transports, the shader keeps running off the
-// last-known singleton state).
+// last-known singleton state.
 //
-// Hotkeys for screen-test:
-//   m  trigger a synthetic Moved sweep
-//   n  trigger a Minted (cycles through unminted entityIds)
-//   e  trigger an EntityMoved pulse on a random already-minted entity
-//   c  trigger a Compare pair on two random minted entities
+// Hotkeys for screen-test: m sweep, n mint, e pulse, c compare.
 interface FullPageProps {
   entityId?: number;
   zoom?: number;
@@ -78,8 +73,6 @@ export function FullPage({
       document.body.classList.remove("mirror-mode");
     };
   }, [mirror]);
-
-  // ---- chain reactivity wiring (always on) ----
 
   const publicClient = usePublicClient();
   const contractAddr =

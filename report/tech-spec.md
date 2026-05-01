@@ -190,3 +190,7 @@ The EUR 6,000 micro-grant from the Pixel Prize was allocated as follows:
 | **Total** | **6,000** | Reconciled. |
 
 The grant's largest share funded open-source engineering — most prominently the port of the TFHE C library to WebAssembly under Apache 2.0, which removes a long-standing patent obstacle in the verifiable FHE space and is now usable by anyone. Hardware (a Mac mini that runs both the oracle and the monolith display) and sculpture materials cover the physical work. Travel covers the May 1-5 grantee exhibition in Berlin. Approximately 10% was withheld as tax. No commercial tools were used; the entire stack is open source under GPL-3.0.
+
+---
+
+*Updated: May 1, 2026, 14:43 CEST.*

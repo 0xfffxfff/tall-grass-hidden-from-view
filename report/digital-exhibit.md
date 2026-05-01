@@ -83,3 +83,7 @@ Everything — Noir circuits, Solidity contracts, TFHE C compiled to WebAssembly
 - Funded by The Pixel Prize / JUST Open Source Stiftung
 - License: GPL-3.0 (whole stack)
 - Network: Ethereum Mainnet
+
+---
+
+*Updated: May 1, 2026, 14:43 CEST.*
