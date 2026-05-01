@@ -33,13 +33,14 @@ import { api, type RevealRecord } from "@/api";
 // NFT depiction — same shader code path, same atmospheric finish; what
 // changes is that the field is reduced to one signature.
 //
-// /full?reactive=1 enables the chain reactivity overlay: live Moved /
-// Minted / EntityMoved contract events and oracle reveals are pushed
-// into reactiveQueue as additive layers over the synthetic field. With
-// ?reactive=1&verbose=1 the synthetic loop's slot transitions and every
-// reactive event log to the console.
+// The chain reactivity overlay is always on: live Moved / Minted /
+// EntityMoved contract events and oracle reveals are pushed into
+// reactiveQueue as additive layers over the synthetic field. RPC failures
+// degrade gracefully (boot replay retries once after 30s, live watchers
+// rotate across fallback transports, the shader keeps running off the
+// last-known singleton state).
 //
-// Hotkeys (only active when ?reactive=1):
+// Hotkeys for screen-test:
 //   m  trigger a synthetic Moved sweep
 //   n  trigger a Minted (cycles through unminted entityIds)
 //   e  trigger an EntityMoved pulse on a random already-minted entity
@@ -54,10 +55,6 @@ interface FullPageProps {
   mirror?: boolean;
   offsetX?: number;
   offsetY?: number;
-  // ?reactive=1
-  reactive?: boolean;
-  // ?verbose=1
-  verbose?: boolean;
 }
 
 // Sepolia public RPCs may reject very old fromBlock ranges. We pull a
@@ -72,8 +69,6 @@ export function FullPage({
   mirror = false,
   offsetX = 0,
   offsetY = 0,
-  reactive = false,
-  verbose = false,
 }: FullPageProps) {
   useEffect(() => {
     document.body.classList.add("full-mode");
@@ -84,122 +79,123 @@ export function FullPage({
     };
   }, [mirror]);
 
-  // ---- chain reactivity wiring (only when ?reactive=1) ----
+  // ---- chain reactivity wiring (always on) ----
 
   const publicClient = usePublicClient();
   const contractAddr =
     tallGrassAddress[APP_CHAIN.id as keyof typeof tallGrassAddress];
 
-  // Boot replay — mark mintedMask for every Minted event the contract has
-  // ever emitted. Past Moved / EntityMoved / Reveal events are intentionally
-  // skipped: their visuals are transient and replaying them as a flood of
-  // ghost sweeps/pulses on boot would lie about *when* they happened.
-  // The persistent kinematic signature claim is per-entity (mintedMask).
+  // Boot replay — mark mintedAt for every Minted event the contract has
+  // emitted in the recent history window. Past Moved / EntityMoved / reveal
+  // events are intentionally skipped: their visuals are transient and
+  // replaying them on boot would lie about *when* they happened. The
+  // persistent kinematic signature claim is per-entity (mintedAt).
+  //
+  // RPC failures (429, IP ban, dead node) are tolerated: the call is
+  // wrapped in try/catch and will retry once after 30s on failure. After
+  // that we give up silently and live subscriptions still try.
   useEffect(() => {
-    if (!reactive || !publicClient || !contractAddr) return;
+    if (!publicClient || !contractAddr) return;
     let cancelled = false;
-    (async () => {
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    async function attempt(label: string): Promise<boolean> {
       try {
-        const latestBlock = await publicClient.getBlockNumber();
+        const latestBlock = await publicClient!.getBlockNumber();
         const fromBlock =
           latestBlock > HISTORY_BLOCK_WINDOW
             ? latestBlock - HISTORY_BLOCK_WINDOW
             : 0n;
-        if (verbose) {
-          console.log(
-            `[reactive] boot replay: fetching Minted logs from block ${fromBlock} to ${latestBlock}`,
-          );
-        }
+        console.log(
+          `[reactive] boot replay (${label}): fetching Minted logs from block ${fromBlock} to ${latestBlock}`,
+        );
         const mintedAbi = tallGrassAbi.find(
           (item) => item.type === "event" && item.name === "Minted",
         );
         if (!mintedAbi) {
           console.warn("[reactive] Minted event ABI not found");
-          return;
+          return true;
         }
-        const logs = await publicClient.getLogs({
+        const logs = await publicClient!.getLogs({
           address: contractAddr,
-          // viem's getLogs accepts an event ABI item directly. Cast to
-          // any here because the imported ABI is `as const`-typed and the
-          // generic inference fights with the union return type.
           event: mintedAbi as never,
           fromBlock,
           toBlock: latestBlock,
         });
-        if (cancelled) return;
-        if (verbose) {
-          console.log(
-            `[reactive] boot replay: ${logs.length} Minted events found`,
-          );
-        }
+        if (cancelled) return true;
+        console.log(
+          `[reactive] boot replay (${label}): ${logs.length} Minted events found`,
+        );
         // Boot-replayed mints already happened in the past, so stamp them
         // with a far-past birth time. The shader's 4s fade-in smoothstep
         // is already at 1.0, and the slabs render at full visibility from
         // frame zero.
         const farPast = -1e6;
         for (const log of logs) {
-          // viem types the parsed event under `args` for known ABIs.
           const args = (log as unknown as { args?: { entityId?: bigint } }).args;
           const id = args?.entityId;
           if (id !== undefined) markMinted(Number(id), farPast);
         }
+        return true;
       } catch (err) {
-        console.warn("[reactive] boot replay failed:", err);
+        console.warn(`[reactive] boot replay (${label}) failed:`, err);
+        return false;
       }
+    }
+    (async () => {
+      const ok = await attempt("first");
+      if (ok || cancelled) return;
+      // One-shot retry after 30s. If both attempts fail, we give up.
+      // Live subscriptions keep working regardless.
+      retryTimer = setTimeout(() => {
+        if (cancelled) return;
+        attempt("retry");
+      }, 30_000);
     })();
     return () => {
       cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [reactive, publicClient, contractAddr, verbose]);
+  }, [publicClient, contractAddr]);
 
   // Live Moved → push extra sweep, parameters seeded from the txHash so
   // each sweep looks distinct without depending on private direction info.
   useWatchTallGrassMovedEvent({
-    enabled: reactive,
     onLogs: (logs) => {
       for (const log of logs) {
         const seed = log.transactionHash ?? log.blockHash ?? "";
         const axis = parseInt(seed.slice(2, 4) || "0", 16) % 2;
         const dir = parseInt(seed.slice(4, 6) || "0", 16) % 2 === 0 ? -1 : 1;
         pushSweep(reactiveState.shaderTime, axis, dir);
-        if (verbose) {
-          console.log(
-            `[reactive] chain Moved → sweep participant=${log.args.participant} tx=${seed.slice(0, 10)}`,
-          );
-        }
+        console.log(
+          `[reactive] chain Moved → sweep participant=${log.args.participant} tx=${seed.slice(0, 10)}`,
+        );
       }
     },
   });
 
-  // Live Minted → flip mintedMask for that entityId. It becomes a
-  // permanent slab in the field from this moment on.
+  // Live Minted → set mintedAt for that entityId. It becomes a permanent
+  // slab in the field from this moment on, fading in over ~4s.
   useWatchTallGrassMintedEvent({
-    enabled: reactive,
     onLogs: (logs) => {
       for (const log of logs) {
         const id = log.args.entityId;
         if (id === undefined) continue;
         markMinted(Number(id), reactiveState.shaderTime);
-        if (verbose) {
-          console.log(
-            `[reactive] chain Minted → entity=#${id} participant=${log.args.participant}`,
-          );
-        }
+        console.log(
+          `[reactive] chain Minted → entity=#${id} participant=${log.args.participant}`,
+        );
       }
     },
   });
 
   // Live EntityMoved → brief pulse on that entity's persistent slab.
   useWatchTallGrassEntityMovedEvent({
-    enabled: reactive,
     onLogs: (logs) => {
       for (const log of logs) {
         const id = log.args.entityId;
         if (id === undefined) continue;
         pulseEntity(Number(id), reactiveState.shaderTime);
-        if (verbose) {
-          console.log(`[reactive] chain EntityMoved → pulse entity=#${id}`);
-        }
+        console.log(`[reactive] chain EntityMoved → pulse entity=#${id}`);
       }
     },
   });
@@ -209,7 +205,6 @@ export function FullPage({
   // it as a real comparison pair (replaces the current pair so the latest
   // reveal always wins the overlay slot).
   useEffect(() => {
-    if (!reactive) return;
     let cancelled = false;
     let lastSeen = 0;
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -235,12 +230,10 @@ export function FullPage({
               trait: newest.trait,
               greaterIsB,
             });
-            if (verbose) {
-              console.log(
-                `[reactive] oracle reveal → pair a=#${newest.a} b=#${newest.b} trait=${newest.trait} op=${newest.op}`,
-              );
-            }
-          } else if (verbose) {
+            console.log(
+              `[reactive] oracle reveal → pair a=#${newest.a} b=#${newest.b} trait=${newest.trait} op=${newest.op}`,
+            );
+          } else {
             console.log(
               `[reactive] reveals high-water set to ${lastSeen} (${data.reveals.length} historical)`,
             );
@@ -258,12 +251,11 @@ export function FullPage({
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [reactive, verbose]);
+  }, []);
 
   // Hotkeys: m / n / e / c trigger synthetic chain events for screen-test
   // without needing actual on-chain activity.
   useEffect(() => {
-    if (!reactive) return;
     function pickRandomMintedId(): number | null {
       const ids: number[] = [];
       for (let i = 0; i < ENTITY_COUNT; i++) {
@@ -326,13 +318,12 @@ export function FullPage({
     }
     document.addEventListener("keydown", onKey);
     console.log(
-      "[reactive] enabled. hotkeys: m=move sweep, n=mint, e=entity pulse, c=compare. verbose=" +
-        (verbose ? "on" : "off"),
+      "[reactive] hotkeys: m=move sweep, n=mint, e=entity pulse, c=compare",
     );
     return () => {
       document.removeEventListener("keydown", onKey);
     };
-  }, [reactive, verbose]);
+  }, []);
 
   return (
     <Stage
@@ -341,8 +332,6 @@ export function FullPage({
       entityId={entityId}
       offsetX={offsetX}
       offsetY={offsetY}
-      reactive={reactive}
-      verbose={verbose}
     />
   );
 }

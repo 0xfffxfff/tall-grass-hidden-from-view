@@ -10,14 +10,8 @@ void main() {
 }
 `;
 
-// Pass 1 — ciphertext-derived kinematics. Three event types layer in a
-// shared world: encounter slabs (single-axis traversals derived from
-// per-entity TFHE bytes), comparison pairs (lockstep slabs derived from
-// pair commitments), and a move sweep (scan line). Y-biased on every
-// renderer because the Monolith is 9:16 portrait. uZoom scales world
-// coordinates so the same field fits a desktop landscape stage at 1.0
-// and the portrait monolith at 1.55. Ported from monolith-previews/
-// noise-preview-v24.html — see that file for design notes.
+// Pass 1. Y-biased for 9:16. uZoom: 1.0 desktop, 1.55 portrait. Ported
+// from monolith-previews/noise-preview-v24.html.
 const FS_NOISE_SRC = `
 precision highp float;
 varying vec2 vUv;
@@ -38,22 +32,13 @@ uniform float uEntityLock;
 // vignette/column passes use vUv (screen space) and stay centred.
 uniform vec2 uOffset;
 
-// Chain reactivity overlay (?reactive=1). When uReactive is 0 every
-// guarded path short-circuits and the visual is bit-identical to the
-// pre-reactive build. See reactiveQueue.ts for the JS side.
-uniform float uReactive;
-// Per-entity mint birth time (shader-time seconds). -1 = unminted /
-// synthetic-only. Drives both the gating ("is this entity minted?") and
-// the fade-in ("how long since it was minted?").
+// Chain overlay state from reactiveQueue.ts. Birth times: -1 = empty,
+// >= 0 = shader-time of event.
 uniform float uMintedAt[32];
-// Per-entity last EntityMoved time (shader-time seconds). -1 = never.
-// Drives a short brightness/scale pulse on that entity's persistent slab.
 uniform float uEntityPulse[32];
-// Recent on-chain Moved events as extra sweep lines, additive over the
-// synthetic period-7 sweep. (birthTime, axis 0/1, dir -1/+1); x < 0 empty.
+// (birthTime, axis 0/1, dir -1/+1)
 uniform vec3 uChainSweep[8];
-// Latest oracle compare. (birthTime, a, b, trait*2 + greaterIsB).
-// x < 0 = none. Rendered additively over the synthetic comparison.
+// (birthTime, a, b, trait*2 + greaterIsB)
 uniform vec4 uChainPair;
 
 float ciphByte(float entityId, float idx) {
@@ -162,10 +147,8 @@ float encounter(vec2 uv, float i, float t) {
 
   float entityId = floor(hash21(vec2(slot, i * 89.0)) * 32.0);
 
-  // In locked mode, skip loop instances of the locked entity. The
-  // locked entity has its own perpetual overlay at screen centre;
-  // additional instances at random positions would read as confusing
-  // duplicates of the same identity at different lifecycle points.
+  // Skip loop instances of the locked entity; it has its own perpetual
+  // overlay at screen centre.
   if (uEntityLock >= 0.0 && abs(entityId - uEntityLock) < 0.5) {
     return 0.0;
   }
@@ -232,86 +215,12 @@ float encounter(vec2 uv, float i, float t) {
   return mask * alpha;
 }
 
-float comparison(vec2 uv, float t) {
-  float period = 24.0;
-  float phase  = t / period;
-  float slot   = floor(phase);
-  float fr     = fract(phase);
-
-  if (fr < 0.02 || fr > 0.98) return 0.0;
-
-  float entityA = floor(hash21(vec2(slot, 401.0)) * 32.0);
-  float entityB = mod(entityA + 1.0
-                    + floor(hash21(vec2(slot, 403.0)) * 31.0), 32.0);
-  float traitId = floor(hash21(vec2(slot, 405.0)) * 7.0);
-
-  float axisX = step(0.70, pairByte(entityA, entityB, traitId, 0.0));
-
-  float lane = (axisX > 0.5)
-             ? snapRowByte(pairByte(entityA, entityB, traitId, 1.0))
-             : snapColByte(pairByte(entityA, entityB, traitId, 1.0));
-
-  float patternRaw = floor(pairByte(entityA, entityB, traitId, 2.0) * 4.0);
-  float pattern = patternRaw < 0.5 ? 0.0
-                : patternRaw < 1.5 ? 1.0
-                : patternRaw < 2.5 ? 4.0
-                : 5.0;
-
-  float u = progressCurve(fr, pattern);
-  float slide = mix(-1.40, 1.40, u);
-  float sep = 0.40;
-
-  vec2 posA, posB;
-  if (axisX > 0.5) {
-    posA = vec2(slide - sep * 0.5, lane);
-    posB = vec2(slide + sep * 0.5, lane);
-  } else {
-    posA = vec2(lane, slide - sep * 0.5);
-    posB = vec2(lane, slide + sep * 0.5);
-  }
-
-  float greaterIsB = step(0.5, hash21(vec2(slot, 71.0)));
-
-  vec2 sizeA = stdSizeByte(ciphByte(entityA, 3.0));
-  vec2 sizeB = stdSizeByte(ciphByte(entityB, 3.0));
-  float kGreater = 1.25;
-  float kLesser  = 0.85;
-  sizeA *= (greaterIsB < 0.5 ? kGreater : kLesser);
-  sizeB *= (greaterIsB > 0.5 ? kGreater : kLesser);
-
-  float bell  = 4.0 * fr * (1.0 - fr);
-  float depth = mix(0.55, 0.05, bell);
-  float edge  = 0.012 + depth * 0.45;
-  float alpha = smoothstep(0.0, 0.10, fr) * (1.0 - smoothstep(0.90, 1.0, fr));
-
-  float ang = (pairByte(entityA, entityB, traitId, 3.0) - 0.5) * 6.2832 * uRot;
-  float cR = cos(ang);
-  float sR = sin(ang);
-  vec2 qA = uv - posA;
-  qA = vec2(cR * qA.x - sR * qA.y, sR * qA.x + cR * qA.y);
-  vec2 qB = uv - posB;
-  qB = vec2(cR * qB.x - sR * qB.y, sR * qB.x + cR * qB.y);
-  float maskA = 1.0 - smoothstep(-edge, edge, sdBox(qA, sizeA));
-  float maskB = 1.0 - smoothstep(-edge, edge, sdBox(qB, sizeB));
-
-  float alphaA = alpha * (greaterIsB < 0.5 ? 1.10 : 0.92);
-  float alphaB = alpha * (greaterIsB > 0.5 ? 1.10 : 0.92);
-
-  return maskA * alphaA + maskB * alphaB;
-}
-
-// Persistent slab for a minted entity. Same kinematic vocabulary as the
-// transient encounter() (axis, position, pattern, rotation derived from
-// the same cipher bytes), but visibility is held high across the whole
-// loop instead of appearing and sinking. mintedTime drives a soft fade-in
-// so the slab eases into the field rather than popping; pulseTime adds a
-// brief brightness boost when an EntityMoved event arrives.
+// Persistent mint slab. Same shape as encounter() but visibility held
+// high across the loop. mintedTime fades in; pulseTime breathes on
+// EntityMoved.
 float chainEntity(vec2 uv, float entityId, float t, float mintedTime, float pulseTime) {
-  // Fade-in from the moment of mint. The shader's time advances at
-  // SPEED=0.06 of wall clock (see the JS side), so the duration here is
-  // in shader-time: 0.24 shader-seconds == 4 wall-clock seconds. Boot-
-  // replayed mints pass a far-past mintedTime so the smoothstep is
-  // already at 1.0 and the slab renders fully on frame zero.
+  // 0.24 shader-sec = 4 wall-sec at SPEED=0.06. Boot-replayed mints pass
+  // far-past mintedTime so fadeIn is already 1.0.
   float fadeIn = smoothstep(0.0, 0.24, t - mintedTime);
   // Per-entity period from cipher byte 14, same as locked-mode camera.
   float period = 14.0 + 7.0 * ciphByte(entityId, 14.0);
@@ -347,11 +256,9 @@ float chainEntity(vec2 uv, float entityId, float t, float mintedTime, float puls
   if (pulseTime < 0.0 || pulseAge < 0.0 || pulseAge > 0.78) {
     pulse = 0.0;
   } else if (pulseAge < 0.12) {
-    // Rise: smoothstep ease-out into the peak.
     pulse = smoothstep(0.0, 0.12, pulseAge);
   } else {
-    // Fall: long, gentle smoothstep down. ~5.5x slower than the rise so
-    // the slab lingers and trails back rather than snapping.
+    // Fall: ~5.5x slower than rise.
     pulse = 1.0 - smoothstep(0.12, 0.78, pulseAge);
   }
 
@@ -362,16 +269,13 @@ float chainEntity(vec2 uv, float entityId, float t, float mintedTime, float puls
   q = vec2(c * q.x - s * q.y, s * q.x + c * q.y);
   float d = sdBox(q, size);
 
-  // Persistent visibility: a soft, steady edge. Pulse no longer changes
-  // the edge or size — only the alpha breathes.
+  // Pulse breathes alpha only; edge and size fixed.
   float depth = 0.30;
   float edge = 0.012 + depth * 0.45;
   float mask = 1.0 - smoothstep(-edge, edge, d);
 
-  // Alpha breathes from the steady 0.85 baseline up toward fully solid
-  // (and beyond into "more black" territory — the downstream ink curve
-  // saturates, mapping high alpha to deep black) at the bell's peak,
-  // then back. fadeIn gates everything during the post-mint ramp.
+  // Alpha intentionally >1 at peak; downstream ink curve saturates to
+  // black. fadeIn gates the post-mint ramp.
   float alpha = (0.85 + pulse * 1.50) * fadeIn;
   return mask * alpha;
 }
@@ -392,26 +296,19 @@ float chainSweepLine(vec2 uv, float t, float birthTime, float axis, float dir) {
   } else {
     d = abs(uv.x - pos);
   }
-  // Broader, softer falloff than the synthetic moveSweep (factor 9.0) so
-  // a chain sweep reads as a wider atmospheric band — distinct from the
-  // ambient sweep's tight signature.
+  // 6.0 vs moveSweep's 9.0: wider band so chain reads distinct.
   float line = exp(-pow(d * 6.0, 2.0));
   float decay = 4.0 * fr * (1.0 - fr);
   return line * decay;
 }
 
-// Real comparison from an oracle reveal. Same visual vocabulary as
-// comparison(): two lockstep slabs sliding through. Birth-time-driven
-// progress on a wall-clock-friendly duration; 0.72 shader-seconds == 12
-// wall-clock seconds at SPEED=0.06, so a chain pair plays out as a
-// readable event rather than the synthetic 24-shader-second loop
-// (which is ~6.7 wall-clock minutes per slot).
+// Oracle compare: winner on tighter window, loser starts and ends a beat
+// later. 2.06 shader-sec = ~34 wall-sec at SPEED=0.06.
 float chainComparisonPair(vec2 uv, float t, vec4 pair) {
   float birthTime = pair.x;
   float age = t - birthTime;
-  if (age < 0.0 || age > 0.72) return 0.0;
-  float fr = age / 0.72;
-  if (fr < 0.02 || fr > 0.98) return 0.0;
+  if (age < 0.0 || age > 2.06) return 0.0;
+  float fr = age / 2.06;
 
   float entityA = pair.y;
   float entityB = pair.z;
@@ -431,17 +328,26 @@ float chainComparisonPair(vec2 uv, float t, vec4 pair) {
                 : patternRaw < 2.5 ? 4.0
                 : 5.0;
 
-  float u = progressCurve(fr, pattern);
-  float slide = mix(-1.40, 1.40, u);
-  float sep = 0.40;
+  // Winner: 0.00..0.65. Loser: 0.15..1.00. They overtake mid-window.
+  float frWin  = clamp((fr - 0.00) / 0.65, 0.0, 1.0);
+  float frLose = clamp((fr - 0.15) / 0.85, 0.0, 1.0);
+  float frA = (greaterIsB < 0.5) ? frWin : frLose;
+  float frB = (greaterIsB > 0.5) ? frWin : frLose;
 
+  float uA = progressCurve(frA, pattern);
+  float uB = progressCurve(frB, pattern);
+  float slideA = mix(-1.40, 1.40, uA);
+  float slideB = mix(-1.40, 1.40, uB);
+
+  // Perpendicular offset so slabs don't collide on overtake.
+  float laneOffset = 0.18;
   vec2 posA, posB;
   if (axisX > 0.5) {
-    posA = vec2(slide - sep * 0.5, lane);
-    posB = vec2(slide + sep * 0.5, lane);
+    posA = vec2(slideA, lane - laneOffset);
+    posB = vec2(slideB, lane + laneOffset);
   } else {
-    posA = vec2(lane, slide - sep * 0.5);
-    posB = vec2(lane, slide + sep * 0.5);
+    posA = vec2(lane - laneOffset, slideA);
+    posB = vec2(lane + laneOffset, slideB);
   }
 
   vec2 sizeA = stdSizeByte(ciphByte(entityA, 3.0));
@@ -451,10 +357,14 @@ float chainComparisonPair(vec2 uv, float t, vec4 pair) {
   sizeA *= (greaterIsB < 0.5 ? kGreater : kLesser);
   sizeB *= (greaterIsB > 0.5 ? kGreater : kLesser);
 
-  float bell  = 4.0 * fr * (1.0 - fr);
-  float depth = mix(0.55, 0.05, bell);
-  float edge  = 0.012 + depth * 0.45;
-  float alpha = smoothstep(0.0, 0.10, fr) * (1.0 - smoothstep(0.90, 1.0, fr));
+  float bellA  = 4.0 * frA * (1.0 - frA);
+  float bellB  = 4.0 * frB * (1.0 - frB);
+  float depthA = mix(0.55, 0.05, bellA);
+  float depthB = mix(0.55, 0.05, bellB);
+  float edgeA  = 0.012 + depthA * 0.45;
+  float edgeB  = 0.012 + depthB * 0.45;
+  float fadeA  = smoothstep(0.0, 0.10, frA) * (1.0 - smoothstep(0.90, 1.0, frA));
+  float fadeB  = smoothstep(0.0, 0.10, frB) * (1.0 - smoothstep(0.90, 1.0, frB));
 
   float ang = (pairByte(entityA, entityB, traitId, 3.0) - 0.5) * 6.2832 * uRot;
   float cR = cos(ang);
@@ -463,11 +373,11 @@ float chainComparisonPair(vec2 uv, float t, vec4 pair) {
   qA = vec2(cR * qA.x - sR * qA.y, sR * qA.x + cR * qA.y);
   vec2 qB = uv - posB;
   qB = vec2(cR * qB.x - sR * qB.y, sR * qB.x + cR * qB.y);
-  float maskA = 1.0 - smoothstep(-edge, edge, sdBox(qA, sizeA));
-  float maskB = 1.0 - smoothstep(-edge, edge, sdBox(qB, sizeB));
+  float maskA = 1.0 - smoothstep(-edgeA, edgeA, sdBox(qA, sizeA));
+  float maskB = 1.0 - smoothstep(-edgeB, edgeB, sdBox(qB, sizeB));
 
-  float alphaA = alpha * (greaterIsB < 0.5 ? 1.10 : 0.92);
-  float alphaB = alpha * (greaterIsB > 0.5 ? 1.10 : 0.92);
+  float alphaA = fadeA * (greaterIsB < 0.5 ? 1.10 : 0.92);
+  float alphaB = fadeB * (greaterIsB > 0.5 ? 1.10 : 0.92);
   return maskA * alphaA + maskB * alphaB;
 }
 
@@ -498,21 +408,14 @@ void main() {
   vec2 uv = (vUv - 0.5) * (uRes / 520.0) / max(uZoom, 0.01);
   float t = uTime;
 
-  // Locked mode: camera tracks the chosen entity. The full field still
-  // renders — other encounters, comparisons, the sweep, all of it — but
-  // the world is shifted so the locked entity sits at screen center.
-  // The locked entity itself is rendered as a perpetual slab on top of
-  // the field (always visible, sharp); it's the protagonist of this
-  // view, not a transient event.
+  // Locked mode: world shifted so the entity sits at screen center.
+  // Locked slab drawn on top of the field.
   bool isLocked = (uEntityLock >= 0.0);
   vec2 cameraPos = vec2(0.0);
   vec2 lockedSize = vec2(0.0);
 
   if (isLocked) {
-    // Compute the locked entity's world position from the same cipher
-    // bytes that Monolith encounters use, on a per-entity period from
-    // cipher byte 14 (unused in Monolith mode). Same code path as
-    // encounter(); recomputable from public bytes.
+    // Same derivation as encounter(); period from cipher byte 14.
     float entityId = uEntityLock;
     float period = 14.0 + 7.0 * ciphByte(entityId, 14.0);
     float fr = fract(t / period);
@@ -540,42 +443,27 @@ void main() {
     // Z-axis entities don't translate; cameraPos stays at (gx, gy).
   }
 
-  // World UV: where in world space this fragment maps to, given the
-  // camera follow shift. In Monolith mode cameraPos is zero so worldUv
-  // == uv (no change). In locked mode, the locked entity ends up at
-  // screen center because its own world position equals cameraPos.
+  // worldUv = uv in Monolith mode; in locked mode the entity lands at
+  // screen center.
   vec2 worldUv = uv + cameraPos + uOffset;
 
-  // Run the field at world coords — same encounters, comparisons, and
-  // sweep. Other slabs appear at their world positions relative to the
-  // camera; comparisons happen wherever they happen; the sweep traverses
-  // world space and slides past the locked entity.
   float ink = 0.0;
   for (int i = 0; i < 64; i++) {
     ink += encounter(worldUv, float(i), t);
   }
-  ink += comparison(worldUv, t);
 
-  // Chain reactivity overlay. Guarded by uReactive so the synthetic-only
-  // build path is bit-identical to the pre-reactive shader. All four
-  // contributions are additive — no synthetic event is replaced or
-  // suppressed.
-  if (uReactive > 0.5) {
-    // Persistent slabs for minted entities (+ fade-in + EntityMoved pulse).
-    for (int eid = 0; eid < 32; eid++) {
-      if (uMintedAt[eid] < 0.0) continue;
-      ink += chainEntity(worldUv, float(eid), t, uMintedAt[eid], uEntityPulse[eid]);
-    }
-    // Real oracle compare on top of the synthetic comparison.
-    // (Chain sweeps render into the haze layer below.)
-    if (uChainPair.x >= 0.0) {
-      ink += chainComparisonPair(worldUv, t, uChainPair);
-    }
+  // Chain overlay: mint slabs additive on the encounter field; chain
+  // pair is the only comparison.
+  for (int eid = 0; eid < 32; eid++) {
+    if (uMintedAt[eid] < 0.0) continue;
+    ink += chainEntity(worldUv, float(eid), t, uMintedAt[eid], uEntityPulse[eid]);
+  }
+  if (uChainPair.x >= 0.0) {
+    ink += chainComparisonPair(worldUv, t, uChainPair);
   }
 
-  // Locked entity overlay: always-visible sharp slab at screen center.
-  // Rendered on top of the field so it remains identifiable even when
-  // other slabs drift past at the same depth.
+  // Drawn on top so the locked entity stays identifiable when slabs
+  // cross at the same depth.
   if (isLocked) {
     float d = sdBox(uv, lockedSize);
     float edge = 0.012 + 0.05 * 0.45;
@@ -583,26 +471,18 @@ void main() {
   }
 
   // Haze drifts with the camera so motion of the locked entity reads
-  // as the world flowing past, not the slab gliding through still air.
+  // as the world flowing past.
   float haze = fbm(vec3(worldUv * 0.7, t * 0.025));
   haze = 0.5 + 0.5 * haze;
-  // Vertical gradient stays on screen-y — atmospheric horizon is around
-  // the viewer, not bound to world coords.
+  // Gradient on screen-y, not world-y.
   haze = mix(haze, haze * 0.85 + 0.15, smoothstep(-0.3, 0.4, uv.y));
-  // Sweep at world coords too — slides past the locked entity from
-  // wherever the chain event points it.
   haze += moveSweep(worldUv, t) * 0.07;
 
-  // Real on-chain Moved sweeps add to the haze layer. Heavier weight
-  // than the synthetic 0.07 so a single chain sweep reads as a discrete
-  // event traveling across the field rather than blending into the
-  // ambient atmosphere.
-  if (uReactive > 0.5) {
-    for (int s = 0; s < 8; s++) {
-      vec3 sw = uChainSweep[s];
-      if (sw.x < 0.0) continue;
-      haze += chainSweepLine(worldUv, t, sw.x, sw.y, sw.z) * 0.25;
-    }
+  // Weight 0.25 vs synthetic 0.07: chain sweep reads as discrete.
+  for (int s = 0; s < 8; s++) {
+    vec3 sw = uChainSweep[s];
+    if (sw.x < 0.0) continue;
+    haze += chainSweepLine(worldUv, t, sw.x, sw.y, sw.z) * 0.25;
   }
 
   ink = 1.0 - exp(-ink * 1.4);
@@ -718,13 +598,6 @@ interface StageProps {
   // dpr=1, zoom=1.4 screen ≈ exactly one screen-width of shift.
   offsetX?: number;
   offsetY?: number;
-  // Enable the chain reactivity overlay. When false (the default) every
-  // shader path guarded by uReactive short-circuits, so the visual is
-  // bit-identical to the pre-reactive build.
-  reactive?: boolean;
-  // Verbose logs of synthetic-loop slot transitions (sweep / comparison).
-  // The reactive layer's own events log themselves from reactiveQueue.ts.
-  verbose?: boolean;
 }
 
 export function Stage({
@@ -734,8 +607,6 @@ export function Stage({
   entityId,
   offsetX = 0,
   offsetY = 0,
-  reactive = false,
-  verbose = false,
 }: StageProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -753,14 +624,6 @@ export function Stage({
   offsetXRef.current = offsetX;
   const offsetYRef = useRef(offsetY);
   offsetYRef.current = offsetY;
-  const reactiveRef = useRef(reactive);
-  reactiveRef.current = reactive;
-  const verboseRef = useRef(verbose);
-  verboseRef.current = verbose;
-  // Sync verbose into the singleton so reactiveQueue.ts logs every push
-  // without threading the flag through call sites.
-  reactiveState.verbose = verbose;
-  reactiveState.enabled = reactive;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -880,17 +743,8 @@ export function Stage({
     let rafId = 0;
     let running = false;
 
-    // Slot-transition logging refs for the synthetic loop. The shader's
-    // sweep period is 7s (moveSweep) and comparison period is 24s. The 64
-    // encounter slots run on per-i variable periods (14..21s) — that's
-    // 64 separate cadences and would drown the console. Skip those and
-    // only log the two global signals.
-    let lastSweepSlot = Math.floor(effectiveTime / 7);
-    let lastCompareSlot = Math.floor(effectiveTime / 24);
-
     // Cache uniform locations once per program — getUniformLocation per
     // frame for 32-entry arrays would be wasteful at 60fps.
-    const locReactive = gl!.getUniformLocation(progNoise, "uReactive");
     const locMintedAt = gl!.getUniformLocation(progNoise, "uMintedAt[0]");
     const locEntityPulse = gl!.getUniformLocation(progNoise, "uEntityPulse[0]");
     const locChainSweep = gl!.getUniformLocation(progNoise, "uChainSweep[0]");
@@ -941,28 +795,10 @@ export function Stage({
         offsetYRef.current * pxToWorld,
       );
 
-      // Synthetic loop slot-transition logs (verbose only). Two global
-      // cadences, period 7 (sweep) and 24 (comparison). Per-i encounter
-      // slots are intentionally not logged — too noisy with 64 of them.
-      if (verboseRef.current) {
-        const sweepSlot = Math.floor(t / 7);
-        if (sweepSlot !== lastSweepSlot) {
-          console.log(`[synthetic] sweep slot ${lastSweepSlot} → ${sweepSlot} t=${t.toFixed(3)}`);
-          lastSweepSlot = sweepSlot;
-        }
-        const compareSlot = Math.floor(t / 24);
-        if (compareSlot !== lastCompareSlot) {
-          console.log(`[synthetic] compare slot ${lastCompareSlot} → ${compareSlot} t=${t.toFixed(3)}`);
-          lastCompareSlot = compareSlot;
-        }
-      }
-
-      // Chain reactivity uniforms. Always uploaded — when reactive is off
-      // the singleton arrays stay at safe defaults (mintedMask=0, pulse=-1,
-      // sweeps[*].x=-1, pair.x=-1) and every guarded shader path returns
-      // zero. The cost is one float + two 32-element arrays + a small
-      // vec3 array + a vec4 per frame, negligible at 60fps.
-      gl!.uniform1f(locReactive, reactiveRef.current ? 1.0 : 0.0);
+      // Chain reactivity uniforms. Singleton defaults (mintedAt=-1,
+      // pulse=-1, sweeps[*].x=-1, pair.x=-1) produce zero contribution in
+      // the shader, so an empty chain (no live activity, RPC down) renders
+      // identically to "synthetic only".
       gl!.uniform1fv(locMintedAt, reactiveState.mintedAt);
       gl!.uniform1fv(locEntityPulse, reactiveState.entityPulse);
       // Pack the sweep ring buffer into the flat float buffer. Empty
