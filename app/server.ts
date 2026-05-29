@@ -257,6 +257,28 @@ function deriveSpawn(walkSecret: bigint): { x: number; y: number } {
   return { x, y };
 }
 
+// Pre-commit-3889248 wallets registered from the grid center. Resolve which
+// spawn a given wallet actually used by matching candidate H(spawn, salt0)
+// against the initial position commitment from its Registered event.
+function resolveSpawn(
+  walkSecret: bigint,
+  initialCommitment: bigint,
+): { x: number; y: number } | null {
+  const salt0 = deriveSalt(walkSecret, 0);
+  const current = deriveSpawn(walkSecret);
+  if (poseidonHash([BigInt(current.x), BigInt(current.y), salt0]) === initialCommitment) {
+    return current;
+  }
+  const legacy = {
+    x: Math.floor(config.GRID_WIDTH / 2),
+    y: Math.floor(config.GRID_HEIGHT / 2),
+  };
+  if (poseidonHash([BigInt(legacy.x), BigInt(legacy.y), salt0]) === initialCommitment) {
+    return legacy;
+  }
+  return null;
+}
+
 function deriveBlindingSeed(entityId: number): bigint {
   return poseidonHash([seed, BigInt(entityId)]);
 }
@@ -444,8 +466,9 @@ async function recoverFromChain(contract: Contract): Promise<void> {
   console.log(`  Found ${regEvents.length} registrations.`);
 
   for (const event of regEvents) {
-    const args = (event as unknown as { args: { participant: string } }).args;
+    const args = (event as unknown as { args: { participant: string; positionCommitment: string } }).args;
     const address = args.participant.toLowerCase();
+    const initialCommitment = BigInt(args.positionCommitment);
 
     // 2. Scan Moved events for this participant
     const movedEvents = await queryFilterPaged(
@@ -457,9 +480,18 @@ async function recoverFromChain(contract: Contract): Promise<void> {
     const sorted = movedEvents
       .sort((a, b) => a.blockNumber - b.blockNumber || a.index - b.index);
 
-    // 3. Replay each move: brute-force 4 directions per step
+    // 3. Pick the spawn that produces this wallet's on-chain initial
+    // commitment. Wallets registered before commit 3889248 spawned at the
+    // grid center; later wallets spawn at deriveSpawn(walkSecret). Either
+    // wins by matching H(spawn, salt0) against the Registered event.
     const walkSecret = deriveWalkSecret(address);
-    const spawn = deriveSpawn(walkSecret);
+    const spawn = resolveSpawn(walkSecret, initialCommitment);
+    if (!spawn) {
+      console.error(`  Cannot resolve spawn for ${address.slice(0, 8)}... (initial commitment matches neither legacy nor current derivation)`);
+      continue;
+    }
+
+    // 4. Replay each move: brute-force 4 directions per step
     const parsed = sorted.map((e) => ({
       newCommitment: BigInt((e as unknown as { args: { newCommitment: string } }).args.newCommitment),
     }));
