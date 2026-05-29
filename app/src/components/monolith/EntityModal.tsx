@@ -16,7 +16,6 @@ import {
   pad2,
   pairKey,
   pairTraitKey,
-  shortAddr,
   recordToReveal,
   type Op,
   type RevealsByPair,
@@ -26,6 +25,7 @@ import { useTokens } from "@/hooks/useTokens";
 import { WorkStrip } from "./WorkStrip";
 import { useReadTallGrassMetadataContract } from "@/generated";
 import { type RevealRecord } from "@/api";
+import { AddrLink } from "./AddrLink";
 
 // Entity #00 is the artist's proof — always treated as revealed even
 // before the on-chain mint, with a hardcoded owner label.
@@ -160,19 +160,23 @@ export function EntityModal({
     query: { enabled: open && !!metadataAddrUsable },
   });
 
-  const ownerLabel = (() => {
+  const ownerAddress: string | null = (() => {
+    if (isArtistProof || privateOnly || !revealed) return null;
+    return (token?.owner as string | undefined) ?? null;
+  })();
+  const ownerFallback: string = (() => {
     if (isArtistProof) return ARTIST_PROOF_OWNER_LABEL;
     if (privateOnly) return "encountered \u00b7 not minted";
     if (!revealed) return "to be revealed";
     if (!token?.owner) return "\u2014";
-    return shortAddr(token.owner);
+    return "\u2014";
   })();
 
+  const ciphertextHash = ciphertextHashRead.data as string | undefined;
   const ciphertextLabel = (() => {
-    const data = ciphertextHashRead.data as string | undefined;
-    if (!data) return "\u2014";
-    if (data.length < 12) return data;
-    return data.slice(0, 6) + "\u2026" + data.slice(-4);
+    if (!ciphertextHash) return "\u2014";
+    if (ciphertextHash.length < 12) return ciphertextHash;
+    return ciphertextHash.slice(0, 6) + "\u2026" + ciphertextHash.slice(-4);
   })();
 
   // Matrix — for each trait t, an array of length entityCount where
@@ -268,12 +272,25 @@ export function EntityModal({
             </div>
             <div className="row">
               <span className="k">owner</span>
-              <span className="v thin">{ownerLabel}</span>
+              {ownerAddress ? (
+                <AddrLink className="v thin" address={ownerAddress} />
+              ) : (
+                <span className="v thin">{ownerFallback}</span>
+              )}
             </div>
             {revealed && (
               <div className="row">
                 <span className="k">ciphertext</span>
-                <span className="v thin hash">{ciphertextLabel}</span>
+                <span
+                  className="v thin hash"
+                  title={ciphertextHash ?? ""}
+                  style={ciphertextHash ? { cursor: "copy" } : undefined}
+                  onClick={() => {
+                    if (ciphertextHash) navigator.clipboard?.writeText(ciphertextHash).catch(() => {});
+                  }}
+                >
+                  {ciphertextLabel}
+                </span>
               </div>
             )}
           </div>
@@ -433,7 +450,11 @@ export function EntityModal({
                     <span className="b">#{pad2(r.b)}</span>
                     <span className="tr">trait {r.trait}</span>
                     <span className="by">
-                      {r.by && r.by !== "anon" ? `by ${r.by}` : ""}
+                      {r.by && r.by !== "anon" && r.by.startsWith("0x") ? (
+                        <>by <AddrLink address={r.by} /></>
+                      ) : (
+                        ""
+                      )}
                     </span>
                   </div>
                 );

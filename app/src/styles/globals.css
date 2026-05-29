@@ -682,7 +682,7 @@ body[data-state="registered"] .you {
 /*  PUBLIC GRID                                                       */
 /* ------------------------------------------------------------------ */
 .public {
-  max-width: 1080px;
+  max-width: 680px;
   margin: 0 auto;
   padding: 88px 28px 0;
 }

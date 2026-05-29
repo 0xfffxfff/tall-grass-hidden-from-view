@@ -25,7 +25,9 @@ export function recordToReveal(rec: RevealRecord): Reveal {
     op: rec.op as Op,
     trait: rec.trait,
     ts: new Date(rec.revealedAt),
-    by: shortAddr(rec.revealer),
+    // Keep the full address — display sites short it themselves (and wrap
+    // it in an explorer link), title attributes show it raw on hover.
+    by: rec.revealer,
   };
 }
 

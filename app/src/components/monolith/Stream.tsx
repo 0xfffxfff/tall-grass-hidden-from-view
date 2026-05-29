@@ -1,4 +1,5 @@
 import { fmtId, fmtTime, type Reveal } from "./monolithLib";
+import { AddrLink } from "./AddrLink";
 
 interface Props {
   rows: Reveal[];
@@ -35,7 +36,7 @@ export function Stream({ rows, enteringIds, onEntityClick }: Props) {
               <span className="tr">trait {r.trait}</span>
               <span className="by">
                 {signed ? (
-                  <>revealed by <span className="addr">{r.by}</span></>
+                  <>revealed by <AddrLink className="addr" address={r.by} /></>
                 ) : null}
               </span>
               <span className="note">{r.note ?? ""}</span>
