@@ -411,13 +411,33 @@ async function generateEncounterProof(
 // Recovery from on-chain events
 // ---------------------------------------------------------------------------
 
+// Many public RPCs cap eth_getLogs at a 50K block window. Paginate to stay
+// under the limit when scanning from deploy block to head.
+const LOG_QUERY_WINDOW = 45_000;
+
+async function queryFilterPaged(
+  contract: Contract,
+  filter: Parameters<Contract["queryFilter"]>[0],
+  fromBlock: number,
+): Promise<Awaited<ReturnType<Contract["queryFilter"]>>> {
+  const latest = await svc.provider.getBlockNumber();
+  const out: Awaited<ReturnType<Contract["queryFilter"]>> = [];
+  for (let start = fromBlock; start <= latest; start += LOG_QUERY_WINDOW) {
+    const end = Math.min(start + LOG_QUERY_WINDOW - 1, latest);
+    const chunk = await contract.queryFilter(filter, start, end);
+    out.push(...chunk);
+  }
+  return out;
+}
+
 async function recoverFromChain(contract: Contract): Promise<void> {
   console.log("  Recovering ALL state from chain events...");
 
   participants.clear();
 
   // 1. Scan Registered events -> find all participants
-  const regEvents = await contract.queryFilter(
+  const regEvents = await queryFilterPaged(
+    contract,
     contract.filters.Registered(),
     svc.deployBlock,
   );
@@ -428,7 +448,8 @@ async function recoverFromChain(contract: Contract): Promise<void> {
     const address = args.participant.toLowerCase();
 
     // 2. Scan Moved events for this participant
-    const movedEvents = await contract.queryFilter(
+    const movedEvents = await queryFilterPaged(
+      contract,
       contract.filters.Moved(address),
       svc.deployBlock,
     );
@@ -459,7 +480,7 @@ async function recoverFromChain(contract: Contract): Promise<void> {
 
   // 4. Recover minted entities
   mintedEntities.clear();
-  const mintEvents = await contract.queryFilter(contract.filters.Minted(), svc.deployBlock);
+  const mintEvents = await queryFilterPaged(contract, contract.filters.Minted(), svc.deployBlock);
   for (const event of mintEvents) {
     const args = (event as unknown as { args: { entityId: bigint } }).args;
     mintedEntities.add(Number(args.entityId));
@@ -936,7 +957,7 @@ async function handleEncounter(body: string): Promise<ApiResponse> {
           }
           if (!found) {
             // Full replay if single-step decode fails
-            const movedEvents = await contract.queryFilter(contract.filters.Moved(address), svc.deployBlock);
+            const movedEvents = await queryFilterPaged(contract, contract.filters.Moved(address), svc.deployBlock);
             const sorted = movedEvents.sort((a, b) => a.blockNumber - b.blockNumber || a.index - b.index);
             const parsed = sorted.map((e) => ({
               newCommitment: BigInt((e as unknown as { args: { newCommitment: string } }).args.newCommitment),
@@ -1193,7 +1214,8 @@ async function handleEntityRecover(url: string, body: string): Promise<ApiRespon
   const onChainMoveCount = Number(await contract.entityMoveCount(entityId) as bigint);
 
   // Replay all EntityMoved events for this entity
-  const movedEvents = await contract.queryFilter(
+  const movedEvents = await queryFilterPaged(
+    contract,
     contract.filters.EntityMoved(entityId),
     svc.deployBlock,
   );
