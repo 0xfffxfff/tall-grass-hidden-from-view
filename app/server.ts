@@ -440,92 +440,211 @@ async function generateEncounterProof(
 // under the limit when scanning from deploy block to head.
 const LOG_QUERY_WINDOW = 45_000;
 
+// Reorg cushion when persisting lastBlock — next startup rescans this many
+// blocks behind the saved tip in case a short reorg moved them. Sepolia
+// reorgs are typically <12 blocks.
+const SNAPSHOT_REORG_CUSHION = 12;
+
 async function queryFilterPaged(
   contract: Contract,
   filter: Parameters<Contract["queryFilter"]>[0],
   fromBlock: number,
+  toBlock?: number,
 ): Promise<Awaited<ReturnType<Contract["queryFilter"]>>> {
-  const latest = await svc.provider.getBlockNumber();
+  const latest = toBlock ?? (await svc.provider.getBlockNumber());
   const out: Awaited<ReturnType<Contract["queryFilter"]>> = [];
   for (let start = fromBlock; start <= latest; start += LOG_QUERY_WINDOW) {
     const end = Math.min(start + LOG_QUERY_WINDOW - 1, latest);
-    const chunk = await contract.queryFilter(filter, start, end);
-    out.push(...chunk);
+    let lastErr: unknown = null;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      try {
+        const chunk = await contract.queryFilter(filter, start, end);
+        out.push(...chunk);
+        lastErr = null;
+        break;
+      } catch (err) {
+        lastErr = err;
+        const backoff = Math.min(30_000, 500 * Math.pow(2, attempt));
+        await new Promise((r) => setTimeout(r, backoff));
+      }
+    }
+    if (lastErr) throw lastErr;
   }
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// State snapshot — avoid re-scanning from deploy block on every restart.
+// ---------------------------------------------------------------------------
+
+interface SnapshotShape {
+  version: 1;
+  contractAddress: string;
+  lastBlock: number;
+  participants: {
+    address: string;
+    x: number;
+    y: number;
+    salt: string;
+    moveCount: number;
+    walkSecret: string;
+  }[];
+  mintedEntities: number[];
+}
+
+function snapshotPath(): string {
+  return join(config.DATA_DIR, "snapshot.json");
+}
+
+function loadSnapshot(contractAddress: string): SnapshotShape | null {
+  const path = snapshotPath();
+  if (!existsSync(path)) return null;
+  try {
+    const snap = JSON.parse(readFileSync(path, "utf-8")) as SnapshotShape;
+    if (snap.version !== 1) return null;
+    if (snap.contractAddress.toLowerCase() !== contractAddress.toLowerCase()) {
+      console.log(`  Snapshot is for ${snap.contractAddress}, current contract is ${contractAddress}. Ignoring.`);
+      return null;
+    }
+    return snap;
+  } catch (err) {
+    console.error(`  Failed to read snapshot, falling back to full scan: ${(err as Error).message}`);
+    return null;
+  }
+}
+
+function saveSnapshot(contractAddress: string, lastBlock: number): void {
+  const snap: SnapshotShape = {
+    version: 1,
+    contractAddress: contractAddress.toLowerCase(),
+    lastBlock: Math.max(0, lastBlock - SNAPSHOT_REORG_CUSHION),
+    participants: Array.from(participants.entries()).map(([address, p]) => ({
+      address,
+      x: p.x,
+      y: p.y,
+      salt: "0x" + p.salt.toString(16),
+      moveCount: p.moveCount,
+      walkSecret: "0x" + p.walkSecret.toString(16),
+    })),
+    mintedEntities: Array.from(mintedEntities).sort((a, b) => a - b),
+  };
+  const path = snapshotPath();
+  const tmp = path + ".tmp";
+  try {
+    if (!existsSync(config.DATA_DIR)) mkdirSync(config.DATA_DIR, { recursive: true });
+    writeFileSync(tmp, JSON.stringify(snap));
+    require("fs").renameSync(tmp, path);
+  } catch (err) {
+    console.error(`  Snapshot write failed: ${(err as Error).message}`);
+  }
+}
+
 async function recoverFromChain(contract: Contract): Promise<void> {
-  console.log("  Recovering ALL state from chain events...");
+  const contractAddress = await contract.getAddress();
+  const tipBlock = await svc.provider.getBlockNumber();
+  const snap = loadSnapshot(contractAddress);
 
   participants.clear();
+  mintedEntities.clear();
 
-  // 1. Scan Registered events -> find all participants
+  let scanFrom = svc.deployBlock;
+  if (snap) {
+    for (const p of snap.participants) {
+      participants.set(p.address, {
+        x: p.x,
+        y: p.y,
+        salt: BigInt(p.salt),
+        moveCount: p.moveCount,
+        walkSecret: BigInt(p.walkSecret),
+      });
+    }
+    for (const id of snap.mintedEntities) mintedEntities.add(id);
+    scanFrom = Math.max(svc.deployBlock, snap.lastBlock + 1);
+    console.log(`  Loaded snapshot @ block ${snap.lastBlock}: ${participants.size} participants, ${mintedEntities.size} minted entities.`);
+    console.log(`  Catching up ${scanFrom} -> ${tipBlock} (${tipBlock - scanFrom} blocks)...`);
+  } else {
+    console.log(`  No snapshot. Full scan ${scanFrom} -> ${tipBlock} (${tipBlock - scanFrom} blocks)...`);
+  }
+
+  // 1. Registered events in the catch-up window -> add new participants.
   const regEvents = await queryFilterPaged(
     contract,
     contract.filters.Registered(),
-    svc.deployBlock,
+    scanFrom,
+    tipBlock,
   );
-  console.log(`  Found ${regEvents.length} registrations.`);
+  console.log(`  Found ${regEvents.length} new registrations.`);
 
   for (const event of regEvents) {
     const args = (event as unknown as { args: { participant: string; positionCommitment: string } }).args;
     const address = args.participant.toLowerCase();
+    if (participants.has(address)) continue;
     const initialCommitment = BigInt(args.positionCommitment);
-
-    // 2. Scan Moved events for this participant
-    const movedEvents = await queryFilterPaged(
-      contract,
-      contract.filters.Moved(address),
-      svc.deployBlock,
-    );
-
-    const sorted = movedEvents
-      .sort((a, b) => a.blockNumber - b.blockNumber || a.index - b.index);
-
-    // 3. Pick the spawn that produces this wallet's on-chain initial
-    // commitment. Wallets registered before commit 3889248 spawned at the
-    // grid center; later wallets spawn at deriveSpawn(walkSecret). Either
-    // wins by matching H(spawn, salt0) against the Registered event.
     const walkSecret = deriveWalkSecret(address);
     const spawn = resolveSpawn(walkSecret, initialCommitment);
     if (!spawn) {
       console.error(`  Cannot resolve spawn for ${address.slice(0, 8)}... (initial commitment matches neither legacy nor current derivation)`);
       continue;
     }
+    const salt0 = deriveSalt(walkSecret, 0);
+    participants.set(address, { x: spawn.x, y: spawn.y, salt: salt0, moveCount: 0, walkSecret });
+  }
 
-    // 4. Replay each move: brute-force 4 directions per step
+  // 2. Moved events in the catch-up window -> advance each affected
+  // participant. We scan all Moved (no address filter) in the same window
+  // so one RPC call covers everyone, then dispatch per-address.
+  const movedAll = await queryFilterPaged(
+    contract,
+    contract.filters.Moved(),
+    scanFrom,
+    tipBlock,
+  );
+  const movedByAddr = new Map<string, typeof movedAll>();
+  for (const ev of movedAll) {
+    const addr = ((ev as unknown as { args: { participant: string } }).args.participant).toLowerCase();
+    let bucket = movedByAddr.get(addr);
+    if (!bucket) { bucket = []; movedByAddr.set(addr, bucket); }
+    bucket.push(ev);
+  }
+  for (const [address, events] of movedByAddr) {
+    const participant = participants.get(address);
+    if (!participant) continue;
+    const sorted = events.sort((a, b) => a.blockNumber - b.blockNumber || a.index - b.index);
     const parsed = sorted.map((e) => ({
       newCommitment: BigInt((e as unknown as { args: { newCommitment: string } }).args.newCommitment),
     }));
     const result = replayPositionMoves(
-      spawn.x, spawn.y,
-      parsed, (i) => deriveSalt(walkSecret, i),
+      participant.x, participant.y,
+      parsed, (i) => deriveSalt(participant.walkSecret, participant.moveCount + i),
     );
-
     if (result) {
-      const salt = deriveSalt(walkSecret, result.moveCount);
-      participants.set(address, { x: result.x, y: result.y, salt, moveCount: result.moveCount, walkSecret });
+      participant.x = result.x;
+      participant.y = result.y;
+      participant.moveCount += result.moveCount;
+      participant.salt = deriveSalt(participant.walkSecret, participant.moveCount);
     } else {
-      console.error(`  Cannot recover moves for ${address.slice(0, 8)}...`);
+      console.error(`  Cannot apply moves for ${address.slice(0, 8)}... (commitment chain broken)`);
     }
   }
 
   console.log(`  Recovered ${participants.size} participants.`);
 
-  // 4. Recover minted entities
-  mintedEntities.clear();
-  const mintEvents = await queryFilterPaged(contract, contract.filters.Minted(), svc.deployBlock);
+  // 3. Minted events in the catch-up window.
+  const mintEvents = await queryFilterPaged(contract, contract.filters.Minted(), scanFrom, tipBlock);
   for (const event of mintEvents) {
     const args = (event as unknown as { args: { entityId: bigint } }).args;
     mintedEntities.add(Number(args.entityId));
   }
   console.log(`  Recovered ${mintedEntities.size} minted entities.`);
 
-  // 5. Recover global moveCounter from on-chain
+  // 4. Read live global moveCounter from contract (cheap, no logs).
   const onChainMoveCounter = await contract.moveCounter() as bigint;
   moveCounter = Number(onChainMoveCounter);
   console.log(`  Move counter: ${moveCounter}`);
+
+  // 5. Persist the snapshot so the next restart skips this work.
+  saveSnapshot(contractAddress, tipBlock);
+  console.log(`  Snapshot saved @ block ${tipBlock - SNAPSHOT_REORG_CUSHION}.`);
 }
 
 // ---------------------------------------------------------------------------
@@ -583,6 +702,20 @@ function subscribeToEvents(contract: Contract): void {
   });
 
   console.log("  Subscribed to chain events (Registered, Moved, Minted, EntityMoved).\n");
+}
+
+// Re-snapshot every 30s so a restart picks up close to the live tip.
+// Cheaper than per-event writes (no burst thrashing) and the cushion
+// inside saveSnapshot already absorbs a ~30s freshness gap.
+function startSnapshotLoop(contractAddress: string): void {
+  setInterval(async () => {
+    try {
+      const tip = await svc.provider.getBlockNumber();
+      saveSnapshot(contractAddress, tip);
+    } catch (err) {
+      console.error(`  Snapshot loop tick failed: ${(err as Error).message}`);
+    }
+  }, 30_000);
 }
 
 // ---------------------------------------------------------------------------
@@ -784,6 +917,7 @@ async function init(): Promise<void> {
     // 8. Recover state from chain + subscribe to live events
     await recoverFromChain(contract);
     subscribeToEvents(contract);
+    startSnapshotLoop(deployment.address);
   } else {
     console.log("  WARNING: Contract deployment not found. Relay tx submission will fail.\n");
   }
