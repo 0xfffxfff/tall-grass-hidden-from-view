@@ -46,19 +46,22 @@ function buildProvider(rpcUrl: string): JsonRpcProvider | FallbackProvider {
   }
   const mk = (url: string) =>
     new JsonRpcProvider(url, SEPOLIA_CHAIN_ID, { staticNetwork: true });
+  // The configured RPC (Alchemy/Infura/etc) leads. Public RPCs back it up
+  // for live tip reads; they refuse archive eth_getLogs once the deploy
+  // block falls outside the hot window, so they cannot be primary.
   const configs = [
-    ...SEPOLIA_PUBLIC_RPCS.map((url, i) => ({
-      provider: mk(url),
-      priority: i + 1,
-      stallTimeout: 2_000,
-      weight: 1,
-    })),
     {
       provider: mk(rpcUrl),
-      priority: 99,
+      priority: 1,
       stallTimeout: 2_000,
       weight: 1,
     },
+    ...SEPOLIA_PUBLIC_RPCS.map((url, i) => ({
+      provider: mk(url),
+      priority: i + 2,
+      stallTimeout: 2_000,
+      weight: 1,
+    })),
   ];
   return new FallbackProvider(configs, SEPOLIA_CHAIN_ID, {
     quorum: 1,
